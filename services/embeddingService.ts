@@ -1,0 +1,49 @@
+import { GoogleGenAI } from "@google/genai";
+
+const API_KEY = process.env.API_KEY || '';
+const ai = new GoogleGenAI({ apiKey: API_KEY });
+
+// Simple in-memory cache to save API calls during session
+const embeddingsCache = new Map<string, number[]>();
+
+export async function getEmbedding(text: string): Promise<number[]> {
+  if (!text) return [];
+  if (embeddingsCache.has(text)) return embeddingsCache.get(text)!;
+
+  try {
+    const response = await ai.models.embedContent({
+      model: "text-embedding-004",
+      contents: {
+        parts: [{ text }]
+      }
+    });
+
+    // Access embedding or embeddings depending on actual return type from SDK which can vary by version
+    const embedding = (response as any).embedding?.values || (response as any).embeddings?.[0]?.values;
+    if (embedding) {
+      embeddingsCache.set(text, embedding);
+      return embedding;
+    }
+    return [];
+  } catch (error) {
+    console.warn("Embedding failed for text:", text.substring(0, 20), error);
+    return [];
+  }
+}
+
+export function cosineSimilarity(vecA: number[], vecB: number[]): number {
+  if (vecA.length !== vecB.length || vecA.length === 0) return 0;
+  
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  
+  if (normA === 0 || normB === 0) return 0;
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
