@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import cytoscape from 'cytoscape';
 import cola from 'cytoscape-cola';
@@ -34,7 +35,7 @@ export const GraphCanvas: React.FC = () => {
             'text-background-padding': '2px',
             'text-background-shape': 'roundrectangle',
             // Tier-4 Visuals
-            // Size based on PageRank
+            // Size based on PageRank: 10 + (pr * 140)
             'width': (ele: any) => {
                const pr = ele.data('pagerank') || 0.01;
                return 10 + (pr * 140); 
@@ -43,7 +44,7 @@ export const GraphCanvas: React.FC = () => {
                const pr = ele.data('pagerank') || 0.01;
                return 10 + (pr * 140);
             },
-            // Border width linked to Clustering Coefficient
+            // Border width linked to Clustering Coefficient: clustering * 8
             'border-width': (ele: any) => {
                const clustering = ele.data('clustering') || 0;
                return Math.max(0, clustering * 8);
@@ -51,24 +52,27 @@ export const GraphCanvas: React.FC = () => {
             'border-color': '#fff',
             'border-opacity': 0.8,
             // Smooth transitions
-            'transition-property': 'background-color, width, height, border-width',
+            'transition-property': 'background-color, width, height, border-width, opacity',
             'transition-duration': 500
           }
         },
         {
           selector: 'edge',
           style: {
+            // Weight is derived from average PageRank of connected nodes (approx range 0.01 - 0.1)
+            // Multiplier needs to be high to show visual distinction.
             'width': (ele: any) => {
               const weight = ele.data('weight');
-              return weight ? Math.max(1, 1 + (weight * 2)) : 1.5;
+              return weight ? Math.max(1, 1 + (weight * 50)) : 1.5;
             },
             'line-color': (ele) => ele.data('sign') === 'negative' ? '#ef4444' : '#10b981', 
             'target-arrow-color': (ele) => ele.data('sign') === 'negative' ? '#ef4444' : '#10b981',
             'target-arrow-shape': 'triangle',
             'curve-style': 'bezier',
             'opacity': (ele: any) => {
-               const weight = ele.data('weight');
-               return weight ? Math.min(1, 0.4 + (weight * 0.6)) : 0.6;
+               // Make important connections more opaque
+               const weight = ele.data('weight') || 0;
+               return Math.min(1, 0.3 + (weight * 3));
             }
           }
         },
@@ -133,7 +137,15 @@ export const GraphCanvas: React.FC = () => {
         cy.nodes().forEach(node => {
            const y = node.data('year');
            // Simple range logic: if node has year and is within range +/- 10 years or user selected specific year
-           const isVisible = !y || (y >= timelineYear - 10 && y <= timelineYear + 10);
+           // If 'dates' string is present, try to check range
+           let isVisible = false;
+           if (!y) {
+               isVisible = false; // Entities without dates fade out in timeline mode
+           } else {
+               // Continuous range check: +/- 10 years of focus or standard lifecycle
+               isVisible = (y >= timelineYear - 20 && y <= timelineYear + 20);
+           }
+           
            node.style('opacity', isVisible ? 1 : 0.15);
            node.connectedEdges().style('opacity', isVisible ? 1 : 0.05);
         });

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../store';
 import { getEmbedding, cosineSimilarity } from '../services/embeddingService';
@@ -22,18 +23,19 @@ export const SemanticSearch: React.FC = () => {
       }
 
       const candidates = [];
-      // This is a simulation of FAISS-wasm behavior using JS
+      // Simulation of FAISS-wasm behavior using JS
       // For <1000 nodes, JS is perfectly "sub-second"
       for (const node of graph.nodes) {
-        // We might not have embedding stored on node yet, need to fetch or skip
-        // For this demo, we assume we might need to compute it on fly or it was precomputed
-        // To be fast, let's use the node description
+        // Use node description + label for embedding context
         const text = `${node.data.label} ${node.data.description || ''}`;
-        const nodeEmb = await getEmbedding(text); // This hits cache mostly
+        
+        // In a real FAISS-wasm impl, we would build the index once. 
+        // Here we rely on embeddingService cache for speed.
+        const nodeEmb = await getEmbedding(text); 
         
         if (nodeEmb.length) {
             const score = cosineSimilarity(queryEmb, nodeEmb);
-            if (score > 0.5) {
+            if (score > 0.4) { // Threshold
                 candidates.push({ node, score });
             }
         }

@@ -1,3 +1,4 @@
+
 export type NodeType = 'person' | 'organization' | 'event' | 'concept' | 'publication' | 'Person' | 'Organization' | 'Event' | 'Concept' | 'Publication';
 
 export interface NodeData {

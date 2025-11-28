@@ -1,3 +1,4 @@
+
 import Graph from 'graphology';
 import cytoscape from 'cytoscape';
 import louvain from 'graphology-communities-louvain';
@@ -51,6 +52,9 @@ export function enrichGraphWithMetrics(graph: KnowledgeGraph): KnowledgeGraph {
   const tempGraph = { ...graph, edges: processedEdges };
   const { globalBalance } = calculateTriadicBalance(tempGraph);
 
+  // Map to store PageRank for edge weighting later
+  const pageRankMap = new Map<string, number>();
+
   // 6. Map results back to nodes
   const newNodes = graph.nodes.map(node => {
     const ele = cy.getElementById(node.data.id);
@@ -60,11 +64,14 @@ export function enrichGraphWithMetrics(graph: KnowledgeGraph): KnowledgeGraph {
 
     // Use 'as any' to access methods if types are not inferred correctly
     const degree = (dcn as any).degree(ele);
-    const pagerankVal = pr.rank(ele);
+    const pagerankVal = parseFloat(pr.rank(ele).toFixed(6));
     const betweennessVal = bc.betweenness(ele);
     const closenessVal = (cc as any).closeness(ele);
     const clusteringVal = clusteringMap[node.data.id] || 0;
     
+    // Store PR for edges
+    pageRankMap.set(node.data.id, pagerankVal);
+
     // Get community from Louvain result
     const communityId = comm[node.data.id] !== undefined ? comm[node.data.id] : 0;
 
@@ -73,11 +80,11 @@ export function enrichGraphWithMetrics(graph: KnowledgeGraph): KnowledgeGraph {
       data: {
         ...node.data,
         degreeCentrality: parseFloat(degree.toFixed(6)),
-        pagerank: parseFloat(pagerankVal.toFixed(6)),
+        pagerank: pagerankVal,
         betweenness: parseFloat(betweennessVal.toFixed(6)),
         closeness: parseFloat(closenessVal.toFixed(6)),
         clustering: parseFloat(clusteringVal.toFixed(6)), 
-        eigenvector: parseFloat(pagerankVal.toFixed(6)), // PageRank is a variant of Eigenvector
+        eigenvector: pagerankVal, // PageRank is a variant of Eigenvector
         community: communityId, // Legacy mapping
         louvainCommunity: communityId, // Real Louvain ID
         kCore: Math.floor(degree * 10)
@@ -85,9 +92,25 @@ export function enrichGraphWithMetrics(graph: KnowledgeGraph): KnowledgeGraph {
     };
   });
 
+  // 7. Calculate Edge Weights based on Node PageRank
+  // Formula: weight = (source.pr + target.pr) / 2
+  const weightedEdges = processedEdges.map(edge => {
+    const prSource = pageRankMap.get(edge.data.source) || 0;
+    const prTarget = pageRankMap.get(edge.data.target) || 0;
+    const weight = (prSource + prTarget) / 2;
+
+    return {
+      ...edge,
+      data: {
+        ...edge.data,
+        weight: parseFloat(weight.toFixed(6))
+      }
+    };
+  });
+
   return {
     nodes: newNodes,
-    edges: processedEdges,
+    edges: weightedEdges,
     meta: {
       ...graph.meta,
       modularity: parseFloat(modularity.toFixed(3)),
