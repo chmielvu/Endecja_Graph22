@@ -1,6 +1,6 @@
 
 import { create } from 'zustand';
-import { AppState, KnowledgeGraph, NodeData, ChatMessage, Toast, RegionalAnalysisResult, DuplicateCandidate } from './types';
+import { AppState, KnowledgeGraph, NodeData, ChatMessage, Toast, RegionalAnalysisResult, DuplicateCandidate, GraphPatch } from './types';
 import { INITIAL_GRAPH } from './constants';
 import { enrichGraphWithMetrics, calculateRegionalMetrics } from './services/graphService';
 import { storage } from './services/storage';
@@ -16,6 +16,7 @@ interface Store extends AppState {
   
   // Graph Mutation
   addNodesAndEdges: (nodes: any[], edges: any[]) => void;
+  applyPatch: (nodes: any[], edges: any[]) => void; // New robust patch applicator
   removeNode: (nodeId: string) => void;
   updateNode: (id: string, data: Partial<NodeData>) => void;
   mergeNodes: (keepId: string, dropId: string) => void;
@@ -33,6 +34,7 @@ interface Store extends AppState {
   runRegionalAnalysis: () => void;
   setShowStatsPanel: (show: boolean) => void;
   setSemanticSearchOpen: (open: boolean) => void;
+  setPendingPatch: (patch: GraphPatch | null) => void;
   
   // UI
   setEditingNode: (id: string | null) => void;
@@ -46,6 +48,10 @@ interface Store extends AppState {
   redo: () => void;
   _history: HistoryState;
   pushHistory: () => void;
+  
+  // Tier-4 Deepening
+  deepeningNodeId: string | null;
+  setDeepeningNode: (id: string | null) => void;
 }
 
 export const useStore = create<Store>((set, get) => ({
@@ -53,6 +59,8 @@ export const useStore = create<Store>((set, get) => ({
   filteredGraph: { nodes: [], edges: [] },
   selectedNodeIds: [],
   editingNodeId: null,
+  deepeningNodeId: null,
+  pendingPatch: null,
   metricsCalculated: false,
   activeCommunityColoring: true,
   minDegreeFilter: 0,
@@ -160,41 +168,73 @@ export const useStore = create<Store>((set, get) => ({
     storage.save(enriched);
   },
 
+  // Simplified Add - mostly for legacy or direct adds
   addNodesAndEdges: (newNodesRaw, newEdgesRaw) => {
-    get().pushHistory(); // Save state
+     get().applyPatch(newNodesRaw, newEdgesRaw);
+  },
+
+  // Robust Patch Application (Upsert Logic)
+  applyPatch: (patchNodes, patchEdges) => {
+    get().pushHistory();
     const { graph } = get();
+
+    // 1. Process Nodes (Upsert)
+    const existingNodeMap = new Map(graph.nodes.map(n => [n.data.id, n]));
     
-    const newNodesData = newNodesRaw.map(n => ({
-      id: n.id,
-      label: n.label,
-      type: n.type,
-      year: typeof n.dates === 'string' ? parseInt(n.dates.substr(0,4)) || 1900 : (n.year || 1900),
-      dates: n.dates,
-      description: n.description,
-      importance: 0.5,
-      region: n.region || 'Unknown'
+    patchNodes.forEach(pn => {
+      const year = typeof pn.dates === 'string' ? parseInt(pn.dates.substr(0,4)) || 1900 : (pn.year || 1900);
+      
+      if (existingNodeMap.has(pn.id)) {
+        // Update Existing
+        const existing = existingNodeMap.get(pn.id)!;
+        existingNodeMap.set(pn.id, {
+          ...existing,
+          data: { ...existing.data, ...pn, year: year || existing.data.year }
+        });
+      } else {
+        // Create New
+        existingNodeMap.set(pn.id, {
+          data: {
+            id: pn.id,
+            label: pn.label || pn.id,
+            type: pn.type || 'concept',
+            year: year,
+            dates: pn.dates,
+            description: pn.description,
+            importance: 0.5,
+            region: pn.region || 'Unknown',
+            certainty: pn.certainty || 'confirmed'
+          }
+        } as any);
+      }
+    });
+
+    // 2. Process Edges
+    const newEdges = patchEdges.map(e => ({
+      data: {
+        id: e.id || `edge_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
+        source: e.source,
+        target: e.target,
+        label: e.relationship || e.label || 'related',
+        dates: e.dates,
+        certainty: e.certainty || 'confirmed',
+        sign: e.sign || 'positive'
+      }
     }));
 
-    const newEdgesData = newEdgesRaw.map(e => ({
-      id: `edge_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
-      source: e.source,
-      target: e.target,
-      label: e.relationship || e.label,
-      dates: e.dates
-    }));
-
-    const existingIds = new Set(graph.nodes.map(n => n.data.id));
-    const uniqueNodes = newNodesData.filter(n => !existingIds.has(n.id)).map(n => ({ data: n }));
-    const uniqueEdges = newEdgesData.map(e => ({ data: e }));
+    // Filter edges to ensure both source/target exist
+    const validNewEdges = newEdges.filter(e => 
+      existingNodeMap.has(e.data.source) && existingNodeMap.has(e.data.target)
+    );
 
     const updatedGraph = {
-      nodes: [...graph.nodes, ...uniqueNodes],
-      edges: [...graph.edges, ...uniqueEdges]
+      nodes: Array.from(existingNodeMap.values()),
+      edges: [...graph.edges, ...validNewEdges]
     };
 
     const enriched = enrichGraphWithMetrics(updatedGraph);
-    set({ graph: enriched, filteredGraph: enriched });
-    storage.save(enriched); 
+    set({ graph: enriched, filteredGraph: enriched, pendingPatch: null });
+    storage.save(enriched);
   },
 
   updateNode: (id, data) => {
@@ -203,8 +243,6 @@ export const useStore = create<Store>((set, get) => ({
     const newNodes = graph.nodes.map(n => 
       n.data.id === id ? { ...n, data: { ...n.data, ...data } } : n
     );
-    // Don't re-run full metrics on single edit for performance, unless necessary
-    // But for consistency we should, or at least keep existing metrics
     const newGraph = { ...graph, nodes: newNodes };
     set({ graph: newGraph, filteredGraph: newGraph });
     storage.save(newGraph);
@@ -286,4 +324,7 @@ export const useStore = create<Store>((set, get) => ({
   setFilterYear: (y) => set({ timelineYear: y }),
   setShowStatsPanel: (show) => set({ showStatsPanel: show }),
   setSemanticSearchOpen: (open) => set({ isSemanticSearchOpen: open }),
+  setPendingPatch: (patch) => set({ pendingPatch: patch }),
+  
+  setDeepeningNode: (id) => set({ deepeningNodeId: id }),
 }));

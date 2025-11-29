@@ -63,6 +63,13 @@ export interface KnowledgeGraph {
   };
 }
 
+export interface GraphPatch {
+  type: 'expansion' | 'deepening';
+  reasoning: string;
+  nodes: Partial<NodeData>[];
+  edges: Partial<EdgeData>[];
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system' | 'model';
@@ -112,6 +119,9 @@ export interface AppState {
   timelineYear: number | null; // Continuous slider value
   showStatsPanel: boolean;
   isSemanticSearchOpen: boolean;
+  
+  // AI Patch Review State
+  pendingPatch: GraphPatch | null;
   
   // Chat State
   messages: ChatMessage[];

@@ -1,10 +1,11 @@
-
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import cytoscape from 'cytoscape';
 import cola from 'cytoscape-cola';
 import { useStore } from '../store';
 import { COLORS, COMMUNITY_COLORS } from '../constants';
 import { NodeData } from '../types';
+import { generateNodeDeepening } from '../services/geminiService';
+import { BookOpenCheck, X } from 'lucide-react';
 
 // Register the Cola extension
 cytoscape.use(cola);
@@ -12,7 +13,50 @@ cytoscape.use(cola);
 export const GraphCanvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
-  const { filteredGraph, activeCommunityColoring, selectedNodeIds, toggleNodeSelection, clearSelection, timelineYear } = useStore();
+  const { 
+    graph, 
+    filteredGraph, 
+    activeCommunityColoring, 
+    selectedNodeIds, 
+    toggleNodeSelection, 
+    clearSelection, 
+    timelineYear, 
+    deepeningNodeId,
+    setDeepeningNode,
+    setThinking,
+    addToast,
+    setPendingPatch
+  } = useStore();
+
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
+
+  // Deepen Logic (Context Menu Version)
+  const handleDeepenContext = async (nodeId: string) => {
+    setContextMenu(null);
+    const node = graph.nodes.find(n => n.data.id === nodeId)?.data;
+    if (!node) return;
+
+    setDeepeningNode(nodeId);
+    setThinking(true);
+    addToast({ title: 'Kwerenda Archiwalna', description: `Przeszukuję teczki dla: ${node.label}...`, type: 'info' });
+
+    try {
+      const result = await generateNodeDeepening(node, graph);
+      
+      setPendingPatch({
+        type: 'deepening',
+        reasoning: result.thoughtProcess,
+        nodes: [{ id: node.id, ...result.updatedProperties }], 
+        edges: result.newEdges
+      });
+      addToast({ title: 'Kwerenda Zakończona', description: 'Zweryfikuj sugerowane zmiany.', type: 'success' });
+    } catch (e) {
+      addToast({ title: 'Błąd Archiwum', description: 'Nie udało się pogłębić wiedzy o węźle.', type: 'error' });
+    } finally {
+      setDeepeningNode(null);
+      setThinking(false);
+    }
+  };
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -34,8 +78,6 @@ export const GraphCanvas: React.FC = () => {
             'text-background-color': '#000',
             'text-background-padding': '2px',
             'text-background-shape': 'roundrectangle',
-            // Tier-4 Visuals
-            // Size based on PageRank: 10 + (pr * 140)
             'width': (ele: any) => {
                const pr = ele.data('pagerank') || 0.01;
                return 10 + (pr * 140); 
@@ -44,23 +86,19 @@ export const GraphCanvas: React.FC = () => {
                const pr = ele.data('pagerank') || 0.01;
                return 10 + (pr * 140);
             },
-            // Border width linked to Clustering Coefficient: clustering * 8
             'border-width': (ele: any) => {
                const clustering = ele.data('clustering') || 0;
-               return Math.max(0, clustering * 8);
+               return clustering * 8;
             },
             'border-color': '#fff',
             'border-opacity': 0.8,
-            // Smooth transitions
-            'transition-property': 'background-color, width, height, border-width, opacity',
+            'transition-property': 'background-color, width, height, border-width, opacity, border-color',
             'transition-duration': 500
           }
         },
         {
           selector: 'edge',
           style: {
-            // Weight is derived from average PageRank of connected nodes (approx range 0.01 - 0.1)
-            // Multiplier needs to be high to show visual distinction.
             'width': (ele: any) => {
               const weight = ele.data('weight');
               return weight ? Math.max(1, 1 + (weight * 50)) : 1.5;
@@ -70,7 +108,6 @@ export const GraphCanvas: React.FC = () => {
             'target-arrow-shape': 'triangle',
             'curve-style': 'bezier',
             'opacity': (ele: any) => {
-               // Make important connections more opaque
                const weight = ele.data('weight') || 0;
                return Math.min(1, 0.3 + (weight * 3));
             }
@@ -94,17 +131,32 @@ export const GraphCanvas: React.FC = () => {
       const node = evt.target;
       const isMulti = evt.originalEvent.shiftKey || evt.originalEvent.ctrlKey;
       toggleNodeSelection(node.id(), isMulti);
+      setContextMenu(null);
     });
 
     cy.on('tap', (evt) => {
       if (evt.target === cy) {
         clearSelection();
+        setContextMenu(null);
       }
     });
 
     cy.on('boxselect', 'node', (evt) => {
       toggleNodeSelection(evt.target.id(), true);
     });
+
+    // Context Menu Handler
+    cy.on('cxttap', 'node', (evt) => {
+      evt.preventDefault();
+      setContextMenu({
+        x: evt.originalEvent.clientX,
+        y: evt.originalEvent.clientY,
+        nodeId: evt.target.id()
+      });
+    });
+
+    // Close menu on zoom/pan
+    cy.on('zoom pan', () => setContextMenu(null));
 
     return () => {
       if (cyRef.current) cyRef.current.destroy();
@@ -127,22 +179,16 @@ export const GraphCanvas: React.FC = () => {
         data: e.data
       }));
 
-      // Diffing or full replacement - for simplicity in this complexity, full replace but keep positions if possible
-      // Cytoscape's json() method might be better but let's stick to remove/add for full sync
       cy.elements().remove();
       cy.add([...newNodes, ...newEdges] as any);
       
-      // Apply Timeline Filter Opacity
       if (timelineYear !== null) {
         cy.nodes().forEach(node => {
            const y = node.data('year');
-           // Simple range logic: if node has year and is within range +/- 10 years or user selected specific year
-           // If 'dates' string is present, try to check range
            let isVisible = false;
            if (!y) {
-               isVisible = false; // Entities without dates fade out in timeline mode
+               isVisible = false; 
            } else {
-               // Continuous range check: +/- 10 years of focus or standard lifecycle
                isVisible = (y >= timelineYear - 20 && y <= timelineYear + 20);
            }
            
@@ -175,7 +221,7 @@ export const GraphCanvas: React.FC = () => {
 
   }, [filteredGraph, timelineYear]);
 
-  // Sync Selection from Store to Graph
+  // Sync Selection
   useEffect(() => {
     if (!cyRef.current) return;
     const cy = cyRef.current;
@@ -187,7 +233,7 @@ export const GraphCanvas: React.FC = () => {
     });
   }, [selectedNodeIds]);
 
-  // Update Styling (Colors)
+  // Update Styling (Colors & Deepening Visuals)
   useEffect(() => {
     if (!cyRef.current) return;
     const cy = cyRef.current;
@@ -196,27 +242,68 @@ export const GraphCanvas: React.FC = () => {
       cy.nodes().forEach(ele => {
         const data = ele.data() as NodeData;
         
-        // Color by Community (Louvain)
+        // Deepening Visual Effect (Active Research)
+        if (deepeningNodeId && data.id === deepeningNodeId) {
+            // Base style for deepening
+            ele.style('border-color', '#be123c'); // Crimson
+            ele.style('border-width', 8);
+            ele.style('border-style', 'double');
+            return;
+        }
+
         let color = '#9ca3af';
-        
         if (activeCommunityColoring) {
-          // Prioritize louvainCommunity, fallback to community
           const commId = data.louvainCommunity !== undefined ? data.louvainCommunity : data.community;
           if (commId !== undefined) {
-             // Cycle through the discrete Gold->Crimson->Navy palette
              color = COMMUNITY_COLORS[commId % COMMUNITY_COLORS.length];
           }
         } else {
-          // Fallback to Type-based coloring
           color = COLORS[data.type] || color;
         }
         
-        // Apply color
         ele.style('background-color', color);
+        if (!ele.selected()) {
+           ele.style('border-color', '#fff');
+           ele.style('border-width', (data.clustering || 0) * 8);
+           ele.style('border-style', 'solid');
+        }
       });
     });
 
-  }, [filteredGraph, activeCommunityColoring]);
+  }, [filteredGraph, activeCommunityColoring, deepeningNodeId]);
+
+  // Animation Pulse Effect for Deepening Node
+  useEffect(() => {
+    if (!deepeningNodeId || !cyRef.current) return;
+    const cy = cyRef.current;
+    const el = cy.$id(deepeningNodeId);
+    
+    // Simple pulsing effect using animation
+    const animate = () => {
+       if (el.removed() || !el.inside()) return; // check if element is valid
+       
+       el.animation({
+         style: { 'border-width': 12, 'border-opacity': 0.5 },
+         duration: 800
+       } as any).play().promise().then(() => {
+         el.animation({
+           style: { 'border-width': 4, 'border-opacity': 1 },
+           duration: 800
+         } as any).play().promise().then(() => {
+            // Check if still deepening same node
+            if (useStore.getState().deepeningNodeId === deepeningNodeId) {
+                animate();
+            }
+         });
+       });
+    };
+    
+    animate();
+
+    return () => {
+        el.stop(true);
+    };
+  }, [deepeningNodeId]);
 
   return (
     <div className="w-full h-full bg-zinc-950 relative overflow-hidden">
@@ -229,6 +316,32 @@ export const GraphCanvas: React.FC = () => {
         </div>
       </div>
       <div ref={containerRef} className="w-full h-full" />
+      
+      {/* Context Menu */}
+      {contextMenu && (
+        <div 
+          className="fixed z-50 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl py-1 min-w-[160px] animate-in fade-in zoom-in-95 duration-100"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          <div className="px-3 py-2 border-b border-zinc-800 mb-1">
+             <span className="text-xs font-bold text-zinc-400 block uppercase">
+               {graph.nodes.find(n => n.data.id === contextMenu.nodeId)?.data.label}
+             </span>
+          </div>
+          <button 
+            onClick={() => handleDeepenContext(contextMenu.nodeId)}
+            className="w-full text-left px-3 py-2 text-sm text-crimson-300 hover:bg-zinc-800 hover:text-white transition-colors flex items-center gap-2"
+          >
+            <BookOpenCheck size={14} className="text-indigo-400" /> Deepen Research
+          </button>
+          <button 
+            onClick={() => setContextMenu(null)}
+            className="w-full text-left px-3 py-2 text-sm text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors flex items-center gap-2"
+          >
+            <X size={14} /> Cancel
+          </button>
+        </div>
+      )}
     </div>
   );
 };

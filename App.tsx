@@ -7,6 +7,7 @@ import { Timeline } from './components/Timeline';
 import { NodeEditorModal } from './components/NodeEditorModal';
 import { StatsPanel } from './components/StatsPanel';
 import { SemanticSearch } from './components/SemanticSearch';
+import { PatchReviewModal } from './components/PatchReviewModal';
 import { useStore } from './store';
 import { X, CheckCircle, AlertCircle, Info, PanelLeft } from 'lucide-react';
 
@@ -51,6 +52,7 @@ function App() {
       <NodeEditorModal />
       <StatsPanel />
       <SemanticSearch />
+      <PatchReviewModal />
 
       <div className="fixed bottom-20 right-4 flex flex-col gap-2 z-50 pointer-events-none">
         {toasts.map(toast => (

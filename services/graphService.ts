@@ -239,7 +239,11 @@ export async function detectDuplicatesSemantic(graph: KnowledgeGraph, threshold:
   const candidates: DuplicateCandidate[] = [];
   const nodes = graph.nodes;
   const nodeEmbeddings: Record<string, number[]> = {};
-  const nodesToCheck = nodes.slice(0, 30); 
+  
+  // FIX: Bump limit to a reasonable batch size for a client-side demo, or remove if using batch API.
+  // For now, increasing to 100 allows meaningful grooming without freezing the browser indefinitely.
+  // Ideally, this should be moved to a Web Worker.
+  const nodesToCheck = nodes.slice(0, 100); 
 
   for (const node of nodesToCheck) {
     const text = `${node.data.label}: ${node.data.description || ''}`;

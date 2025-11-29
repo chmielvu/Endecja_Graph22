@@ -1,24 +1,21 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useStore } from '../store';
-import { Play, Download, Search, Scissors, X, GitMerge, Map, Activity, Edit2, Trash2, BrainCircuit, Undo2, Redo2, FileJson } from 'lucide-react';
-import { generateGraphExpansion } from '../services/geminiService';
+import { Play, Download, Search, Scissors, X, GitMerge, Map, Activity, Edit2, Trash2, BrainCircuit, Undo2, Redo2, FileJson, BookOpenCheck } from 'lucide-react';
+import { generateGraphExpansion, generateNodeDeepening } from '../services/geminiService';
 import { detectDuplicatesSemantic, detectDuplicates } from '../services/graphService';
 import { DuplicateCandidate } from '../types';
 
 export const SidebarLeft: React.FC = () => {
   const { 
     graph, 
-    initGraph, 
     recalculateGraph,
     selectedNodeIds, 
     clearSelection,
     activeCommunityColoring, 
     setCommunityColoring, 
-    addNodesAndEdges,
     setThinking,
     mergeNodes,
-    removeNode,
     addToast,
     runRegionalAnalysis,
     regionalAnalysis,
@@ -27,7 +24,9 @@ export const SidebarLeft: React.FC = () => {
     setShowStatsPanel,
     isSidebarOpen,
     setSemanticSearchOpen,
-    undo, redo, canUndo, canRedo
+    undo, redo, canUndo, canRedo,
+    setDeepeningNode,
+    setPendingPatch
   } = useStore();
 
   const [dupeCandidates, setDupeCandidates] = useState<DuplicateCandidate[]>([]);
@@ -82,7 +81,6 @@ export const SidebarLeft: React.FC = () => {
   const handleRunMetrics = () => {
     try {
       recalculateGraph();
-      // Get updated graph to display the correct modularity
       const { graph: updatedGraph } = useStore.getState();
       addToast({ 
         title: 'Analiza Zakończona', 
@@ -105,11 +103,40 @@ export const SidebarLeft: React.FC = () => {
     addToast({ title: 'Expanding Graph', description: 'Consulting Gemini 3 Pro...', type: 'info' });
     try {
       const result = await generateGraphExpansion(graph, topic);
-      addNodesAndEdges(result.newNodes, result.newEdges);
-      addToast({ title: 'Expanded', description: `Added ${result.newNodes.length} nodes.`, type: 'success' });
+      setPendingPatch({
+        type: 'expansion',
+        reasoning: result.thoughtProcess,
+        nodes: result.newNodes,
+        edges: result.newEdges
+      });
+      // addToast removed here as modal will open
     } catch (e) {
       addToast({ title: 'Error', description: 'Expansion failed.', type: 'error' });
     } finally {
+      setThinking(false);
+    }
+  };
+  
+  const handleDeepen = async () => {
+    if (!selectedNode) return;
+    setDeepeningNode(selectedNode.id);
+    setThinking(true);
+    addToast({ title: 'Kwerenda Archiwalna', description: `Przeszukuję teczki dla: ${selectedNode.label}...`, type: 'info' });
+    try {
+      const result = await generateNodeDeepening(selectedNode, graph);
+      
+      setPendingPatch({
+        type: 'deepening',
+        reasoning: result.thoughtProcess,
+        // Wrap the update in the list. ID is crucial for the Store to recognize it as an update.
+        nodes: [{ id: selectedNode.id, ...result.updatedProperties }], 
+        edges: result.newEdges
+      });
+
+    } catch (e) {
+      addToast({ title: 'Błąd Archiwum', description: 'Nie udało się pogłębić wiedzy o węźle.', type: 'error' });
+    } finally {
+      setDeepeningNode(null);
       setThinking(false);
     }
   };
@@ -245,6 +272,10 @@ export const SidebarLeft: React.FC = () => {
                           Comm ID: <span className="font-mono font-bold">{selectedNode.louvainCommunity}</span>
                         </div>
                       </div>
+                      
+                      <button onClick={handleDeepen} className="w-full btn-zinc text-xs mt-2 border-crimson-900/50 text-crimson-300 hover:bg-crimson-950/30">
+                         <BookOpenCheck size={12}/> Pogłębij Wiedzę (Agent)
+                      </button>
 
                       <button onClick={() => setEditingNode(selectedNode.id)} className="w-full btn-zinc text-xs mt-2"><Edit2 size={12}/> Edit Node</button>
                     </div>
