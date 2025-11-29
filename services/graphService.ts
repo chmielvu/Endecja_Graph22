@@ -3,7 +3,7 @@ import Graph from 'graphology';
 import cytoscape from 'cytoscape';
 import louvain from 'graphology-communities-louvain';
 import { KnowledgeGraph, RegionalAnalysisResult, DuplicateCandidate } from '../types';
-import { getEmbedding, cosineSimilarity } from './embeddingService';
+import { getEmbedding, getEmbeddingsBatch, cosineSimilarity } from './embeddingService';
 
 /**
  * Calculates robust graph metrics using a headless Cytoscape instance.
@@ -13,6 +13,10 @@ import { getEmbedding, cosineSimilarity } from './embeddingService';
 export function enrichGraphWithMetrics(graph: KnowledgeGraph): KnowledgeGraph {
   // Ensure we handle potential 'links' vs 'edges' confusion if data comes from external source
   const safeEdges = graph.edges || (graph as any).links || [];
+  
+  if (graph.nodes.length === 0) {
+     return { ...graph, meta: { ...graph.meta, modularity: 0, globalBalance: 1 } };
+  }
   
   // Initialize headless Cytoscape for calculation
   const cy = cytoscape({
@@ -24,76 +28,112 @@ export function enrichGraphWithMetrics(graph: KnowledgeGraph): KnowledgeGraph {
   });
 
   // 1. Calculate Centralities (Cytoscape Core)
-  const pr = cy.elements().pageRank({ dampingFactor: 0.85, precision: 0.000001 });
-  const bc = cy.elements().betweennessCentrality({ directed: true });
-  // Cast options to any to avoid strict type checks on optional properties like 'root'
-  const cc = cy.elements().closenessCentrality({ directed: true } as any);
-  // Provide weight function or cast to any for degreeCentralityNormalized
-  const dcn = cy.elements().degreeCentralityNormalized({ directed: true, weight: () => 1 } as any);
+  let pr: any, bc: any, dcn: any;
+  try {
+     pr = cy.elements().pageRank({ dampingFactor: 0.85, precision: 0.000001 });
+     bc = cy.elements().betweennessCentrality({ directed: true });
+     dcn = cy.elements().degreeCentralityNormalized({ directed: true, weight: () => 1 } as any);
+  } catch (e) {
+      console.warn("Centrality calculation failed", e);
+      // Fallback mocks
+      pr = { rank: () => 0.01 };
+      bc = { betweenness: () => 0 };
+      dcn = { degree: () => 0 };
+  }
   
   // 2. Local Clustering Coefficient (Manual Implementation)
-  const clusteringMap = calculateClusteringCoefficient(cy);
+  let clusteringMap: Record<string, number> = {};
+  try {
+     clusteringMap = calculateClusteringCoefficient(cy);
+  } catch(e) {
+     console.warn("Clustering failed", e);
+  }
 
   // 3. Community Detection (Real Louvain via graphology-communities-louvain)
   // Convert to Graphology instance for Louvain algorithm
-  const graphologyGraph = buildGraphologyGraph(graph);
+  let comm: Record<string, number> = {};
+  let modularity = 0;
   
-  // Run Louvain algorithm
-  // detailed() returns { communities: { nodeId: communityId }, modularity: number, ... }
-  // We need to cast louvain to any because TS might not know about .detailed on the default export depending on types
-  const louvainDetails = (louvain as any).detailed(graphologyGraph);
-  const comm = louvainDetails.communities;
-  const modularity = louvainDetails.modularity;
+  try {
+      const graphologyGraph = buildGraphologyGraph(graph);
+      // Run Louvain algorithm if graph is not empty and lib is valid
+      if (graphologyGraph.order > 0) {
+        // Safe check for louvain export structure which might vary by environment/CDN
+        if (louvain && typeof (louvain as any).detailed === 'function') {
+           const louvainDetails = (louvain as any).detailed(graphologyGraph);
+           comm = louvainDetails.communities;
+           modularity = louvainDetails.modularity;
+        } else {
+           console.warn("Louvain library not correctly loaded or missing 'detailed' method.");
+        }
+      }
+  } catch (e) {
+      console.warn("Louvain detection failed:", e);
+  }
 
   // 4. Edge Metrics (Sign, Certainty)
-  const processedEdges = processEdgeMetrics(safeEdges);
+  let processedEdges = [];
+  try {
+     processedEdges = processEdgeMetrics(safeEdges);
+  } catch (e) {
+     console.warn("Edge metrics failed", e);
+     processedEdges = safeEdges;
+  }
   
   // 5. Triadic Balance
-  const tempGraph = { ...graph, edges: processedEdges };
-  const { globalBalance } = calculateTriadicBalance(tempGraph);
+  let globalBalance = 1;
+  try {
+      const tempGraph = { ...graph, edges: processedEdges };
+      const balanceResult = calculateTriadicBalance(tempGraph);
+      globalBalance = balanceResult.globalBalance;
+  } catch(e) {
+      console.warn("Balance calculation failed", e);
+  }
 
   // Map to store PageRank for edge weighting later
   const pageRankMap = new Map<string, number>();
 
   // 6. Map results back to nodes
   const newNodes = graph.nodes.map(node => {
-    const ele = cy.getElementById(node.data.id);
-    
-    // Safety check if node exists in cytoscape instance
-    if (ele.length === 0) return node;
+    try {
+        const ele = cy.getElementById(node.data.id);
+        
+        // Safety check if node exists in cytoscape instance
+        if (ele.length === 0) return node;
 
-    // Use 'as any' to access methods if types are not inferred correctly
-    const degree = (dcn as any).degree(ele);
-    const pagerankVal = parseFloat(pr.rank(ele).toFixed(6));
-    const betweennessVal = bc.betweenness(ele);
-    const closenessVal = (cc as any).closeness(ele);
-    const clusteringVal = clusteringMap[node.data.id] || 0;
-    
-    // Store PR for edges
-    pageRankMap.set(node.data.id, pagerankVal);
+        // Use 'as any' to access methods if types are not inferred correctly
+        const degree = (dcn as any).degree ? (dcn as any).degree(ele) : 0;
+        const pagerankVal = pr && pr.rank ? parseFloat(pr.rank(ele).toFixed(6)) : 0.01;
+        const betweennessVal = bc && bc.betweenness ? bc.betweenness(ele) : 0;
+        const clusteringVal = clusteringMap[node.data.id] || 0;
+        
+        // Store PR for edges
+        pageRankMap.set(node.data.id, pagerankVal);
 
-    // Get community from Louvain result
-    const communityId = comm[node.data.id] !== undefined ? comm[node.data.id] : 0;
+        // Get community from Louvain result
+        const communityId = comm[node.data.id] !== undefined ? comm[node.data.id] : 0;
 
-    return {
-      ...node,
-      data: {
-        ...node.data,
-        degreeCentrality: parseFloat(degree.toFixed(6)),
-        pagerank: pagerankVal,
-        betweenness: parseFloat(betweennessVal.toFixed(6)),
-        closeness: parseFloat(closenessVal.toFixed(6)),
-        clustering: parseFloat(clusteringVal.toFixed(6)), 
-        eigenvector: pagerankVal, // PageRank is a variant of Eigenvector
-        community: communityId, // Legacy mapping
-        louvainCommunity: communityId, // Real Louvain ID
-        kCore: Math.floor(degree * 10)
-      }
-    };
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            degreeCentrality: parseFloat(degree.toFixed(6)),
+            pagerank: pagerankVal,
+            betweenness: parseFloat(betweennessVal.toFixed(6)),
+            clustering: parseFloat(clusteringVal.toFixed(6)), 
+            eigenvector: pagerankVal, // PageRank is a variant of Eigenvector
+            community: communityId, // Legacy mapping
+            louvainCommunity: communityId, // Real Louvain ID
+            kCore: Math.floor(degree * 10)
+          }
+        };
+    } catch (e) {
+        console.warn(`Node metric update failed for ${node.data.id}`, e);
+        return node;
+    }
   });
 
   // 7. Calculate Edge Weights based on Node PageRank
-  // Formula: weight = (source.pr + target.pr) / 2
   const weightedEdges = processedEdges.map(edge => {
     const prSource = pageRankMap.get(edge.data.source) || 0;
     const prTarget = pageRankMap.get(edge.data.target) || 0;
@@ -121,38 +161,39 @@ export function enrichGraphWithMetrics(graph: KnowledgeGraph): KnowledgeGraph {
 
 /**
  * Calculates Local Clustering Coefficient for each node in the Cytoscape instance.
- * C_v = 2 * (number of edges between neighbors) / (k * (k - 1))
  */
 function calculateClusteringCoefficient(cy: cytoscape.Core): Record<string, number> {
   const coefficients: Record<string, number> = {};
 
   cy.nodes().forEach(node => {
-    const neighbors = node.neighborhood().nodes();
-    const k = neighbors.length;
+    try {
+        const neighbors = node.neighborhood().nodes();
+        const k = neighbors.length;
 
-    if (k < 2) {
-      coefficients[node.id()] = 0;
-      return;
-    }
-
-    let links = 0;
-    // Safely convert collection to array for iteration
-    const neighborArray = neighbors.toArray();
-
-    // Check connections between neighbors
-    for (let i = 0; i < k; i++) {
-      for (let j = i + 1; j < k; j++) {
-        // Check if edge exists between neighbors[i] and neighbors[j]
-        const n1 = neighborArray[i];
-        const n2 = neighborArray[j];
-        if (n1.edgesWith(n2).length > 0) {
-          links++;
+        if (k < 2) {
+          coefficients[node.id()] = 0;
+          return;
         }
-      }
-    }
 
-    // Formula for undirected graph clustering coefficient
-    coefficients[node.id()] = (2 * links) / (k * (k - 1));
+        let links = 0;
+        // Safely convert collection to array for iteration
+        const neighborArray = neighbors.toArray();
+
+        // Check connections between neighbors
+        for (let i = 0; i < k; i++) {
+          for (let j = i + 1; j < k; j++) {
+            const n1 = neighborArray[i];
+            const n2 = neighborArray[j];
+            if (n1 && n2 && n1.edgesWith(n2).length > 0) {
+              links++;
+            }
+          }
+        }
+
+        coefficients[node.id()] = (2 * links) / (k * (k - 1));
+    } catch (e) {
+        coefficients[node.id()] = 0;
+    }
   });
 
   return coefficients;
@@ -164,19 +205,21 @@ function calculateClusteringCoefficient(cy: cytoscape.Core): Record<string, numb
 function processEdgeMetrics(edges: any[]): any[] {
   const negativeKeywords = ['conflict', 'rival', 'anti', 'against', 'enemy', 'opponent', 'fight', 'konflikt', 'rywal', 'przeciw', 'wro'];
   return edges.map(edge => {
-    const text = (edge.data.label || '').toLowerCase();
-    const isNegative = negativeKeywords.some(kw => text.includes(kw));
-    
-    return {
-      ...edge,
-      data: {
-        ...edge.data,
-        // Preserve existing sign if present, otherwise calculate heuristic
-        sign: edge.data.sign || (isNegative ? 'negative' : 'positive'),
-        // Preserve existing certainty or default to confirmed
-        certainty: edge.data.certainty || 'confirmed'
-      }
-    };
+    try {
+        const text = (edge.data.label || '').toLowerCase();
+        const isNegative = negativeKeywords.some(kw => text.includes(kw));
+        
+        return {
+          ...edge,
+          data: {
+            ...edge.data,
+            sign: edge.data.sign || (isNegative ? 'negative' : 'positive'),
+            certainty: edge.data.certainty || 'confirmed'
+          }
+        };
+    } catch (e) {
+        return edge;
+    }
   });
 }
 
@@ -204,8 +247,8 @@ export function calculateTriadicBalance(graph: KnowledgeGraph): { globalBalance:
   const nodeIds = nodes.map(n => n.data.id);
   const n = nodeIds.length;
   
-  // Limit calculation for very large graphs in demo
-  const limit = Math.min(n, 200);
+  // Limit calculation for very large graphs
+  const limit = Math.min(n, 150);
 
   for (let i = 0; i < limit; i++) {
     for (let j = i + 1; j < limit; j++) {
@@ -233,22 +276,24 @@ export function calculateTriadicBalance(graph: KnowledgeGraph): { globalBalance:
 }
 
 /**
- * Semantic Duplicate Detection
+ * Semantic Duplicate Detection with Batch Processing
  */
 export async function detectDuplicatesSemantic(graph: KnowledgeGraph, threshold: number = 0.88): Promise<DuplicateCandidate[]> {
   const candidates: DuplicateCandidate[] = [];
   const nodes = graph.nodes;
-  const nodeEmbeddings: Record<string, number[]> = {};
   
-  // FIX: Bump limit to a reasonable batch size for a client-side demo, or remove if using batch API.
-  // For now, increasing to 100 allows meaningful grooming without freezing the browser indefinitely.
-  // Ideally, this should be moved to a Web Worker.
+  // Limit check to 100 for responsiveness
   const nodesToCheck = nodes.slice(0, 100); 
+  const textsToCheck = nodesToCheck.map(n => `${n.data.label}: ${n.data.description || ''}`);
 
-  for (const node of nodesToCheck) {
-    const text = `${node.data.label}: ${node.data.description || ''}`;
-    nodeEmbeddings[node.data.id] = await getEmbedding(text);
-  }
+  // Batch fetch embeddings
+  const embeddings = await getEmbeddingsBatch(textsToCheck);
+
+  // Map IDs to embeddings
+  const nodeEmbeddings: Record<string, number[]> = {};
+  nodesToCheck.forEach((node, i) => {
+    nodeEmbeddings[node.data.id] = embeddings[i];
+  });
 
   for (let i = 0; i < nodesToCheck.length; i++) {
     for (let j = i + 1; j < nodesToCheck.length; j++) {

@@ -60,6 +60,7 @@ export interface KnowledgeGraph {
     modularity?: number;
     globalBalance?: number; // 0 to 1
     lastSaved?: number;
+    version?: string; // Data version for migration
   };
 }
 
@@ -101,6 +102,14 @@ export interface RegionalAnalysisResult {
   dominantRegion: string;
 }
 
+export interface ResearchTask {
+  id: string;
+  type: 'expansion' | 'deepening' | 'analysis';
+  target: string;
+  status: 'running' | 'complete' | 'failed';
+  reasoning?: string;
+}
+
 export interface AppState {
   // Graph State
   graph: KnowledgeGraph;
@@ -111,6 +120,7 @@ export interface AppState {
   // Analysis State
   metricsCalculated: boolean;
   activeCommunityColoring: boolean;
+  showCertainty: boolean; // Toggle for Evidence Quality Mode
   minDegreeFilter: number;
   regionalAnalysis: RegionalAnalysisResult | null;
   
@@ -122,6 +132,7 @@ export interface AppState {
   
   // AI Patch Review State
   pendingPatch: GraphPatch | null;
+  activeResearchTasks: ResearchTask[];
   
   // Chat State
   messages: ChatMessage[];

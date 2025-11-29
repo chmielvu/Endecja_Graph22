@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { X, Check, BrainCircuit, ArrowRight, GitCommit } from 'lucide-react';
@@ -40,13 +39,13 @@ export const PatchReviewModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-4xl flex flex-col h-[85vh] animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-zinc-950 border border-[#b45309]/30 rounded-xl shadow-2xl w-full max-w-4xl flex flex-col h-[85vh] animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <div className="p-6 border-b border-zinc-800 flex justify-between items-start bg-zinc-900/50">
+        <div className="p-6 border-b border-[#b45309]/20 flex justify-between items-start bg-zinc-900/50">
           <div>
             <h2 className="text-xl font-serif font-bold text-white flex items-center gap-2">
-              <BrainCircuit className="text-indigo-400" /> 
+              <BrainCircuit className="text-[#355e3b]" /> 
               {pendingPatch.type === 'expansion' ? 'AI Graph Expansion' : 'Archives Review'}
             </h2>
             <p className="text-sm text-zinc-400 mt-1">Review proposed changes before applying to the Knowledge Graph.</p>
@@ -56,8 +55,8 @@ export const PatchReviewModal: React.FC = () => {
 
         {/* Reasoning Block */}
         <div className="p-6 bg-zinc-900/30 border-b border-zinc-800 shrink-0">
-          <h3 className="text-xs font-bold text-zinc-500 uppercase mb-2">Agent Reasoning</h3>
-          <p className="text-sm text-zinc-300 font-serif italic border-l-2 border-indigo-500 pl-3">
+          <h3 className="text-xs font-bold text-[#b45309] uppercase mb-2">Agent Reasoning</h3>
+          <p className="text-sm text-zinc-300 font-serif italic border-l-2 border-[#355e3b] pl-3">
             "{pendingPatch.reasoning}"
           </p>
         </div>
@@ -78,12 +77,12 @@ export const PatchReviewModal: React.FC = () => {
               {pendingPatch.nodes.map((node, i) => {
                 const isUpdate = existingNodeIds.has(node.id!);
                 return (
-                  <label key={i} className={`flex gap-3 p-3 rounded border transition-colors cursor-pointer group ${selectedNodeIdxs.has(i) ? 'bg-zinc-900/50 border-zinc-700' : 'opacity-60 border-transparent hover:bg-zinc-900'}`}>
+                  <label key={i} className={`flex gap-3 p-3 rounded border transition-colors cursor-pointer group ${selectedNodeIdxs.has(i) ? 'bg-[#355e3b]/10 border-[#355e3b]/30' : 'opacity-60 border-transparent hover:bg-zinc-900'}`}>
                     <input 
                       type="checkbox" 
                       checked={selectedNodeIdxs.has(i)} 
                       onChange={() => toggleNode(i)}
-                      className="mt-1 rounded border-zinc-700 bg-zinc-900 text-indigo-600 focus:ring-offset-zinc-950"
+                      className="mt-1 rounded border-zinc-700 bg-zinc-900 text-[#355e3b] focus:ring-offset-zinc-950 accent-[#355e3b]"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -112,12 +111,12 @@ export const PatchReviewModal: React.FC = () => {
 
             <div className="space-y-3">
               {pendingPatch.edges.map((edge, i) => (
-                 <label key={i} className={`flex gap-3 p-3 rounded border transition-colors cursor-pointer group ${selectedEdgeIdxs.has(i) ? 'bg-zinc-900/50 border-zinc-700' : 'opacity-60 border-transparent hover:bg-zinc-900'}`}>
+                 <label key={i} className={`flex gap-3 p-3 rounded border transition-colors cursor-pointer group ${selectedEdgeIdxs.has(i) ? 'bg-[#355e3b]/10 border-[#355e3b]/30' : 'opacity-60 border-transparent hover:bg-zinc-900'}`}>
                     <input 
                       type="checkbox" 
                       checked={selectedEdgeIdxs.has(i)} 
                       onChange={() => toggleEdge(i)}
-                      className="mt-1 rounded border-zinc-700 bg-zinc-900 text-indigo-600 focus:ring-offset-zinc-950"
+                      className="mt-1 rounded border-zinc-700 bg-zinc-900 text-[#355e3b] focus:ring-offset-zinc-950 accent-[#355e3b]"
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2 text-sm text-zinc-300">
@@ -125,7 +124,7 @@ export const PatchReviewModal: React.FC = () => {
                         <ArrowRight size={12} className="text-zinc-600" />
                         <span className="font-mono text-xs text-zinc-500 truncate max-w-[80px]">{edge.target}</span>
                       </div>
-                      <div className="text-xs text-indigo-300 font-bold mt-1">{edge.label}</div>
+                      <div className="text-xs text-[#b45309] font-bold mt-1">{edge.label}</div>
                       {edge.sign === 'negative' && <div className="text-[10px] text-red-400 mt-0.5">Negative / Conflict</div>}
                     </div>
                  </label>
@@ -145,7 +144,7 @@ export const PatchReviewModal: React.FC = () => {
           <button 
             onClick={handleApply}
             disabled={selectedNodeIdxs.size === 0 && selectedEdgeIdxs.size === 0}
-            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold rounded flex items-center gap-2 shadow-lg shadow-indigo-900/20"
+            className="px-6 py-2 bg-[#355e3b] hover:bg-[#2a4a2f] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold rounded flex items-center gap-2 shadow-lg shadow-[#355e3b]/20"
           >
             <GitCommit size={16} />
             Apply Changes ({selectedNodeIdxs.size + selectedEdgeIdxs.size})

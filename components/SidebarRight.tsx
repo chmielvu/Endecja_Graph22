@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { chatWithAgent } from '../services/geminiService';
-import { Send, Cpu, Link as LinkIcon, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
+import { Send, Cpu, ChevronDown, ChevronRight, MessageSquare, Scroll } from 'lucide-react';
 
 export const SidebarRight: React.FC = () => {
   const { messages, addMessage, isThinking, setThinking, graph } = useStore();
@@ -45,12 +45,12 @@ export const SidebarRight: React.FC = () => {
   };
 
   return (
-    <div className="w-[420px] h-full bg-zinc-900 border-l border-zinc-800 flex flex-col flex-shrink-0">
-      <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900">
-        <h2 className="text-sm font-bold text-zinc-200 flex items-center gap-2">
-          <MessageSquare size={16} /> Rozmowa z Romanem Dmowskim (1925)
+    <div className="w-[420px] h-full bg-[#0c0c0e] border-l border-[#b45309]/20 flex flex-col flex-shrink-0">
+      <div className="p-4 border-b border-[#b45309]/20 flex justify-between items-center bg-[#0c0c0e]">
+        <h2 className="text-lg font-bold text-[#e4e4e7] flex items-center gap-2 font-spectral">
+          <MessageSquare size={18} className="text-[#b45309]" /> Roman Dmowski (1925)
         </h2>
-        <span className="text-xs bg-zinc-800 px-2 py-1 rounded text-zinc-400">Persona Mode</span>
+        <span className="text-[10px] bg-[#355e3b]/10 text-[#355e3b] border border-[#355e3b]/30 px-2 py-0.5 rounded font-mono">PERSONA ACTIVE</span>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -59,18 +59,18 @@ export const SidebarRight: React.FC = () => {
         ))}
         {isThinking && (
           <div className="flex gap-2 items-start animate-pulse opacity-70">
-            <div className="w-8 h-8 rounded-full bg-indigo-900/50 flex items-center justify-center">
-               <Cpu size={14} className="text-indigo-400" />
+            <div className="w-8 h-8 rounded-full bg-[#b45309]/20 flex items-center justify-center border border-[#b45309]/30">
+               <Cpu size={14} className="text-[#b45309]" />
             </div>
-            <div className="bg-zinc-800 rounded-lg p-3 text-xs text-zinc-400">
-              Dmowski myśli nad odpowiedzią...
+            <div className="bg-[#18181b] rounded-lg p-3 text-xs text-zinc-400 font-serif italic border border-zinc-800">
+              Dmowski analizuje sytuację geopolityczną...
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 border-t border-zinc-800 bg-zinc-900">
+      <div className="p-4 border-t border-[#b45309]/20 bg-[#0c0c0e]">
         <div className="flex gap-2">
           <input
             type="text"
@@ -78,12 +78,12 @@ export const SidebarRight: React.FC = () => {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Zadaj pytanie Panu Romanowi..."
-            className="flex-1 bg-zinc-950 border border-zinc-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+            className="flex-1 bg-[#09090b] border border-zinc-800 rounded-sm px-3 py-2 text-sm text-white focus:outline-none focus:border-[#b45309] font-serif placeholder:font-sans placeholder:text-zinc-600"
           />
           <button 
             onClick={handleSend}
             disabled={isThinking}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-md disabled:opacity-50"
+            className="bg-[#355e3b] hover:bg-[#2f5335] text-white p-2 rounded-sm disabled:opacity-50 border border-[#355e3b]"
           >
             <Send size={16} />
           </button>
@@ -99,27 +99,27 @@ const ChatMessageItem: React.FC<{ msg: any }> = ({ msg }) => {
 
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-      <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center ${isUser ? 'bg-zinc-700' : 'bg-indigo-900/50'}`}>
-        {isUser ? <span className="text-xs">Ty</span> : <span className="font-serif font-bold text-xs text-indigo-200">RD</span>}
+      <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center border ${isUser ? 'bg-[#355e3b]/20 border-[#355e3b]/50' : 'bg-[#b45309]/10 border-[#b45309]/30'}`}>
+        {isUser ? <span className="text-xs text-[#355e3b] font-bold">Ty</span> : <span className="font-serif font-bold text-xs text-[#b45309]">RD</span>}
       </div>
       
       <div className={`max-w-[85%] space-y-2`}>
-        <div className={`p-3 rounded-lg text-sm break-words whitespace-pre-wrap ${isUser ? 'bg-zinc-800 text-zinc-100' : 'bg-zinc-800/50 text-zinc-200 border border-zinc-700'}`}>
+        <div className={`p-3 rounded-sm text-sm break-words whitespace-pre-wrap ${isUser ? 'bg-[#355e3b]/10 text-zinc-200 border border-[#355e3b]/30' : 'bg-[#18181b] text-[#e4e4e7] border border-zinc-800 font-serif'}`}>
           {msg.content}
         </div>
 
         {/* ReAct Reasoning Dropdown */}
         {!isUser && msg.reasoning && (
-           <div className="border border-zinc-800 rounded bg-zinc-900/50 overflow-hidden">
+           <div className="border border-[#b45309]/20 rounded-sm bg-[#0c0c0e] overflow-hidden">
              <button 
                onClick={() => setShowReasoning(!showReasoning)}
-               className="w-full flex items-center gap-2 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 transition-colors text-xs text-zinc-500"
+               className="w-full flex items-center gap-2 px-3 py-1.5 bg-[#0c0c0e] hover:bg-[#18181b] transition-colors text-xs text-[#b45309]"
              >
                {showReasoning ? <ChevronDown size={12}/> : <ChevronRight size={12}/>}
-               Logi systemowe
+               <Scroll size={10} /> Przemyślenia (Chain-of-Thought)
              </button>
              {showReasoning && (
-               <div className="p-3 text-xs text-zinc-400 font-mono bg-zinc-950/30 whitespace-pre-wrap border-t border-zinc-800 break-words">
+               <div className="p-3 text-xs text-zinc-500 font-mono bg-black/20 whitespace-pre-wrap border-t border-[#b45309]/10 break-words">
                  {msg.reasoning}
                </div>
              )}

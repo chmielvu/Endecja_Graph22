@@ -17,6 +17,7 @@ export const GraphCanvas: React.FC = () => {
     graph, 
     filteredGraph, 
     activeCommunityColoring, 
+    showCertainty,
     selectedNodeIds, 
     toggleNodeSelection, 
     clearSelection, 
@@ -25,7 +26,9 @@ export const GraphCanvas: React.FC = () => {
     setDeepeningNode,
     setThinking,
     addToast,
-    setPendingPatch
+    setPendingPatch,
+    addResearchTask,
+    updateResearchTask
   } = useStore();
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
@@ -38,7 +41,16 @@ export const GraphCanvas: React.FC = () => {
 
     setDeepeningNode(nodeId);
     setThinking(true);
-    addToast({ title: 'Kwerenda Archiwalna', description: `Przeszukuję teczki dla: ${node.label}...`, type: 'info' });
+    
+    // Create Research Task
+    const taskId = Date.now().toString();
+    addResearchTask({
+        id: taskId,
+        type: 'deepening',
+        target: node.label,
+        status: 'running',
+        reasoning: 'Initializing archival query...'
+    });
 
     try {
       const result = await generateNodeDeepening(node, graph);
@@ -49,9 +61,12 @@ export const GraphCanvas: React.FC = () => {
         nodes: [{ id: node.id, ...result.updatedProperties }], 
         edges: result.newEdges
       });
-      addToast({ title: 'Kwerenda Zakończona', description: 'Zweryfikuj sugerowane zmiany.', type: 'success' });
+      
+      updateResearchTask(taskId, { status: 'complete', reasoning: result.thoughtProcess });
+      
     } catch (e) {
       addToast({ title: 'Błąd Archiwum', description: 'Nie udało się pogłębić wiedzy o węźle.', type: 'error' });
+      updateResearchTask(taskId, { status: 'failed', reasoning: 'Query failed.' });
     } finally {
       setDeepeningNode(null);
       setThinking(false);
@@ -70,13 +85,15 @@ export const GraphCanvas: React.FC = () => {
           selector: 'node',
           style: {
             'label': 'data(label)',
-            'color': '#ffffff',
-            'font-size': '12px',
+            'color': '#f4f4f5',
+            'font-family': 'Spectral, serif',
+            'font-weight': 'bold',
+            'font-size': '14px',
             'text-valign': 'bottom',
-            'text-margin-y': 5,
-            'text-background-opacity': 0.7,
-            'text-background-color': '#000',
-            'text-background-padding': '2px',
+            'text-margin-y': 6,
+            'text-background-opacity': 0.8,
+            'text-background-color': '#09090b',
+            'text-background-padding': '4px',
             'text-background-shape': 'roundrectangle',
             'width': (ele: any) => {
                const pr = ele.data('pagerank') || 0.01;
@@ -90,9 +107,9 @@ export const GraphCanvas: React.FC = () => {
                const clustering = ele.data('clustering') || 0;
                return clustering * 8;
             },
-            'border-color': '#fff',
-            'border-opacity': 0.8,
-            'transition-property': 'background-color, width, height, border-width, opacity, border-color',
+            'border-color': '#b45309', // Gold tint default
+            'border-opacity': 0.6,
+            'transition-property': 'background-color, width, height, border-width, opacity, border-color, border-style',
             'transition-duration': 500
           }
         },
@@ -103,13 +120,13 @@ export const GraphCanvas: React.FC = () => {
               const weight = ele.data('weight');
               return weight ? Math.max(1, 1 + (weight * 50)) : 1.5;
             },
-            'line-color': (ele) => ele.data('sign') === 'negative' ? '#ef4444' : '#10b981', 
-            'target-arrow-color': (ele) => ele.data('sign') === 'negative' ? '#ef4444' : '#10b981',
+            'line-color': (ele) => ele.data('sign') === 'negative' ? '#be123c' : '#355e3b', // Crimson (neg) vs OWP Green (pos)
+            'target-arrow-color': (ele) => ele.data('sign') === 'negative' ? '#be123c' : '#355e3b',
             'target-arrow-shape': 'triangle',
             'curve-style': 'bezier',
             'opacity': (ele: any) => {
                const weight = ele.data('weight') || 0;
-               return Math.min(1, 0.3 + (weight * 3));
+               return Math.min(1, 0.2 + (weight * 2));
             }
           }
         },
@@ -117,8 +134,11 @@ export const GraphCanvas: React.FC = () => {
           selector: ':selected',
           style: {
             'border-width': 4,
-            'border-color': '#facc15', // yellow-400
-            'background-color': '#facc15'
+            'border-color': '#b45309', // Gold for selection
+            'background-color': '#b45309',
+            'text-background-color': '#b45309',
+            'text-background-opacity': 1,
+            'color': '#000'
           }
         }
       ],
@@ -233,7 +253,7 @@ export const GraphCanvas: React.FC = () => {
     });
   }, [selectedNodeIds]);
 
-  // Update Styling (Colors & Deepening Visuals)
+  // Update Styling (Colors, Deepening, Certainty)
   useEffect(() => {
     if (!cyRef.current) return;
     const cy = cyRef.current;
@@ -251,26 +271,42 @@ export const GraphCanvas: React.FC = () => {
             return;
         }
 
-        let color = '#9ca3af';
+        let color = '#52525b'; // default zinc-600
         if (activeCommunityColoring) {
           const commId = data.louvainCommunity !== undefined ? data.louvainCommunity : data.community;
           if (commId !== undefined) {
              color = COMMUNITY_COLORS[commId % COMMUNITY_COLORS.length];
           }
         } else {
-          color = COLORS[data.type] || color;
+          // Fallback to type colors if needed, but override with theme if possible
+           color = COLORS[data.type] || color;
         }
         
         ele.style('background-color', color);
+        
+        // Border Style based on Certainty Mode
         if (!ele.selected()) {
-           ele.style('border-color', '#fff');
-           ele.style('border-width', (data.clustering || 0) * 8);
-           ele.style('border-style', 'solid');
+           // Default border is subtle goldish from main style, override here if needed
+           if (showCertainty) {
+             const cert = data.certainty;
+             if (cert === 'disputed') {
+                ele.style('border-style', 'dashed');
+                ele.style('border-color', '#be123c'); // Crimson for disputed
+             }
+             else if (cert === 'alleged') {
+                ele.style('border-style', 'dotted');
+             }
+             else {
+                ele.style('border-style', 'solid');
+             }
+           } else {
+             ele.style('border-style', 'solid');
+           }
         }
       });
     });
 
-  }, [filteredGraph, activeCommunityColoring, deepeningNodeId]);
+  }, [filteredGraph, activeCommunityColoring, deepeningNodeId, showCertainty]);
 
   // Animation Pulse Effect for Deepening Node
   useEffect(() => {
@@ -306,13 +342,14 @@ export const GraphCanvas: React.FC = () => {
   }, [deepeningNodeId]);
 
   return (
-    <div className="w-full h-full bg-zinc-950 relative overflow-hidden">
+    <div className="w-full h-full bg-[#09090b] relative overflow-hidden">
       <div className="absolute top-4 left-4 z-10 pointer-events-none">
-        <div className="text-zinc-500 text-xs font-mono bg-black/50 p-1 rounded backdrop-blur-sm border border-zinc-800">
+        <div className="text-zinc-500 text-xs font-mono bg-black/50 p-1 rounded backdrop-blur-sm border border-[#b45309]/30">
           <div>Nodes: {filteredGraph.nodes.length} | Edges: {filteredGraph.edges.length}</div>
           <div>Balance: {((filteredGraph.meta?.globalBalance || 1) * 100).toFixed(1)}%</div>
           <div>Modularity: {filteredGraph.meta?.modularity?.toFixed(3) || 'N/A'}</div>
-          <div>Coloring: {activeCommunityColoring ? 'Louvain Communities' : 'Entity Type'}</div>
+          <div className="text-[#b45309]">Coloring: {activeCommunityColoring ? 'Louvain Communities' : 'Entity Type'}</div>
+          {showCertainty && <div className="text-[#be123c] font-bold">Mode: Evidence Quality</div>}
         </div>
       </div>
       <div ref={containerRef} className="w-full h-full" />
@@ -320,19 +357,19 @@ export const GraphCanvas: React.FC = () => {
       {/* Context Menu */}
       {contextMenu && (
         <div 
-          className="fixed z-50 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl py-1 min-w-[160px] animate-in fade-in zoom-in-95 duration-100"
+          className="fixed z-50 bg-[#0c0c0e] border border-[#b45309]/30 rounded-sm shadow-xl py-1 min-w-[160px] animate-in fade-in zoom-in-95 duration-100"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
-          <div className="px-3 py-2 border-b border-zinc-800 mb-1">
-             <span className="text-xs font-bold text-zinc-400 block uppercase">
+          <div className="px-3 py-2 border-b border-[#b45309]/10 mb-1">
+             <span className="text-xs font-bold text-[#b45309] block uppercase font-spectral">
                {graph.nodes.find(n => n.data.id === contextMenu.nodeId)?.data.label}
              </span>
           </div>
           <button 
             onClick={() => handleDeepenContext(contextMenu.nodeId)}
-            className="w-full text-left px-3 py-2 text-sm text-crimson-300 hover:bg-zinc-800 hover:text-white transition-colors flex items-center gap-2"
+            className="w-full text-left px-3 py-2 text-sm text-[#be123c] hover:bg-[#be123c]/10 transition-colors flex items-center gap-2 font-serif italic"
           >
-            <BookOpenCheck size={14} className="text-indigo-400" /> Deepen Research
+            <BookOpenCheck size={14} /> Deepen Research
           </button>
           <button 
             onClick={() => setContextMenu(null)}

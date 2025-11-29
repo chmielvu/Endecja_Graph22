@@ -1,10 +1,10 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useStore } from '../store';
-import { Play, Download, Search, Scissors, X, GitMerge, Map, Activity, Edit2, Trash2, BrainCircuit, Undo2, Redo2, FileJson, BookOpenCheck } from 'lucide-react';
+import { Play, Search, Scissors, X, GitMerge, Map, Activity, Edit2, Trash2, BrainCircuit, Undo2, Redo2, FileJson, BookOpenCheck, ShieldAlert, PanelLeftClose } from 'lucide-react';
 import { generateGraphExpansion, generateNodeDeepening } from '../services/geminiService';
 import { detectDuplicatesSemantic, detectDuplicates } from '../services/graphService';
 import { DuplicateCandidate } from '../types';
+import { MieczykIcon } from './MieczykIcon';
 
 export const SidebarLeft: React.FC = () => {
   const { 
@@ -14,6 +14,8 @@ export const SidebarLeft: React.FC = () => {
     clearSelection,
     activeCommunityColoring, 
     setCommunityColoring, 
+    showCertainty,
+    setCertaintyMode,
     setThinking,
     mergeNodes,
     addToast,
@@ -23,17 +25,20 @@ export const SidebarLeft: React.FC = () => {
     bulkDeleteSelection,
     setShowStatsPanel,
     isSidebarOpen,
+    toggleSidebar,
     setSemanticSearchOpen,
     undo, redo, canUndo, canRedo,
     setDeepeningNode,
-    setPendingPatch
+    setPendingPatch,
+    addResearchTask,
+    updateResearchTask
   } = useStore();
 
   const [dupeCandidates, setDupeCandidates] = useState<DuplicateCandidate[]>([]);
   const [showDupeModal, setShowDupeModal] = useState(false);
   
   // Resizable Sidebar State
-  const [sidebarWidth, setSidebarWidth] = useState(420);
+  const [sidebarWidth, setSidebarWidth] = useState(380);
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -49,7 +54,7 @@ export const SidebarLeft: React.FC = () => {
   const resize = useCallback((e: MouseEvent) => {
     if (isResizing) {
       const newWidth = e.clientX;
-      if (newWidth > 240 && newWidth < 800) {
+      if (newWidth > 280 && newWidth < 800) {
         setSidebarWidth(newWidth);
       }
     }
@@ -100,7 +105,9 @@ export const SidebarLeft: React.FC = () => {
     const topic = prompt("Enter a topic or entity to expand upon:");
     if (!topic) return;
     setThinking(true);
-    addToast({ title: 'Expanding Graph', description: 'Consulting Gemini 3 Pro...', type: 'info' });
+    const taskId = Date.now().toString();
+    addResearchTask({ id: taskId, type: 'expansion', target: topic, status: 'running', reasoning: 'Querying historical database...' });
+
     try {
       const result = await generateGraphExpansion(graph, topic);
       setPendingPatch({
@@ -109,9 +116,10 @@ export const SidebarLeft: React.FC = () => {
         nodes: result.newNodes,
         edges: result.newEdges
       });
-      // addToast removed here as modal will open
+      updateResearchTask(taskId, { status: 'complete', reasoning: result.thoughtProcess });
     } catch (e) {
       addToast({ title: 'Error', description: 'Expansion failed.', type: 'error' });
+      updateResearchTask(taskId, { status: 'failed', reasoning: 'API Error' });
     } finally {
       setThinking(false);
     }
@@ -121,20 +129,23 @@ export const SidebarLeft: React.FC = () => {
     if (!selectedNode) return;
     setDeepeningNode(selectedNode.id);
     setThinking(true);
-    addToast({ title: 'Kwerenda Archiwalna', description: `Przeszukuję teczki dla: ${selectedNode.label}...`, type: 'info' });
+    const taskId = Date.now().toString();
+    addResearchTask({ id: taskId, type: 'deepening', target: selectedNode.label, status: 'running', reasoning: 'Searching archives...' });
+    
     try {
       const result = await generateNodeDeepening(selectedNode, graph);
       
       setPendingPatch({
         type: 'deepening',
         reasoning: result.thoughtProcess,
-        // Wrap the update in the list. ID is crucial for the Store to recognize it as an update.
         nodes: [{ id: selectedNode.id, ...result.updatedProperties }], 
         edges: result.newEdges
       });
+      updateResearchTask(taskId, { status: 'complete', reasoning: result.thoughtProcess });
 
     } catch (e) {
       addToast({ title: 'Błąd Archiwum', description: 'Nie udało się pogłębić wiedzy o węźle.', type: 'error' });
+      updateResearchTask(taskId, { status: 'failed', reasoning: 'Search failed' });
     } finally {
       setDeepeningNode(null);
       setThinking(false);
@@ -165,6 +176,16 @@ export const SidebarLeft: React.FC = () => {
     const dropId = keepA ? candidate.nodeB.id : candidate.nodeA.id;
     mergeNodes(keepId, dropId);
     setDupeCandidates(prev => prev.filter(c => c !== candidate));
+  };
+
+  const handleExportJSON = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(graph, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "endecja_kg_dump.json");
+    document.body.appendChild(downloadAnchorNode); 
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
   };
 
   const handleExportObsidian = () => {
@@ -200,105 +221,175 @@ export const SidebarLeft: React.FC = () => {
     <>
       <div 
         ref={sidebarRef}
-        className={`${isSidebarOpen ? 'border-r' : 'border-r-0'} bg-zinc-900 border-zinc-800 overflow-hidden flex-shrink-0 relative`}
+        className={`${isSidebarOpen ? 'border-r' : 'border-r-0'} bg-[#0c0c0e] border-[#355e3b]/30 overflow-hidden flex-shrink-0 relative shadow-2xl shadow-black z-20`}
         style={{ 
           width: isSidebarOpen ? sidebarWidth : 0, 
-          transition: isResizing ? 'none' : 'width 0.3s ease-in-out' 
+          transition: isResizing ? 'none' : 'width 0.3s cubic-bezier(0.16, 1, 0.3, 1)' 
         }}
       >
-        <div style={{ width: sidebarWidth }} className="h-full flex flex-col p-4 overflow-y-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-              Endecja KG <span className="text-[10px] text-zinc-500 bg-zinc-800 px-1 rounded">Tier-4</span>
-            </h2>
+        <div style={{ width: sidebarWidth }} className="h-full flex flex-col p-5 overflow-y-auto">
+          
+          {/* Header Section with Icon and Title */}
+          <div className="flex items-start justify-between mb-8">
+            <div className="flex items-center gap-3 group">
+                <div className="text-[#355e3b] group-hover:text-[#b45309] transition-colors duration-500 drop-shadow-[0_0_10px_rgba(53,94,59,0.5)]">
+                    <MieczykIcon size={36} />
+                </div>
+                <div>
+                    <h1 className="font-spectral font-bold text-2xl text-zinc-100 tracking-wide leading-none">
+                      ENDECJA<span className="text-[#355e3b]">KG</span>
+                    </h1>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] text-[#355e3b] font-mono tracking-widest border border-[#355e3b]/30 px-1 rounded bg-[#355e3b]/5">
+                        TIER-4
+                      </span>
+                      <span className="text-[10px] text-zinc-500 font-serif italic">Archival System</span>
+                    </div>
+                </div>
+            </div>
+            
             <div className="flex items-center gap-1">
-               <button onClick={undo} disabled={!canUndo()} className="p-1 text-zinc-400 hover:text-white disabled:opacity-30"><Undo2 size={16}/></button>
-               <button onClick={redo} disabled={!canRedo()} className="p-1 text-zinc-400 hover:text-white disabled:opacity-30"><Redo2 size={16}/></button>
+               <div className="flex mr-2 bg-zinc-900/50 rounded border border-zinc-800">
+                  <button onClick={undo} disabled={!canUndo()} className="p-1.5 text-zinc-500 hover:text-white disabled:opacity-20 transition-colors"><Undo2 size={14}/></button>
+                  <div className="w-[1px] bg-zinc-800"></div>
+                  <button onClick={redo} disabled={!canRedo()} className="p-1.5 text-zinc-500 hover:text-white disabled:opacity-20 transition-colors"><Redo2 size={14}/></button>
+               </div>
+               <button 
+                  onClick={toggleSidebar} 
+                  className="text-zinc-600 hover:text-[#355e3b] transition-colors p-1"
+                  title="Collapse"
+               >
+                  <PanelLeftClose size={20} />
+               </button>
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Analysis</label>
-              <button onClick={handleRunMetrics} className="w-full btn-zinc"><Play size={16} /> Analiza i Rozwój Grafu</button>
-              <button onClick={() => setSemanticSearchOpen(true)} className="w-full btn-zinc text-indigo-400 border-indigo-900/50"><Search size={16} /> Wyszukiwanie Semantyczne</button>
-              <button onClick={() => setShowStatsPanel(true)} className="w-full btn-zinc text-emerald-400"><Activity size={16} /> Graph Dashboard</button>
-              <button onClick={runRegionalAnalysis} className="w-full btn-zinc border-purple-800 text-purple-300"><Map size={16} /> Regional Analysis</button>
-              {regionalAnalysis && (
-                <div className="p-3 bg-purple-950/20 border border-purple-900/50 rounded-lg text-xs space-y-2">
-                  <div className="flex justify-between"><span className="text-purple-300">Isolation Index:</span> <span className="font-mono text-white">{(regionalAnalysis.isolationIndex * 100).toFixed(1)}%</span></div>
-                </div>
-              )}
+          <div className="space-y-8">
+            
+            {/* Analysis Section */}
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-[#355e3b] uppercase tracking-[0.2em] font-spectral opacity-80 pl-1">
+                Analysis Protocols
+              </label>
+              <div className="grid grid-cols-1 gap-2">
+                <button onClick={handleRunMetrics} className="btn-zinc group justify-between">
+                   <div className="flex items-center gap-2"><Play size={16} className="text-[#355e3b] group-hover:text-white transition-colors"/> Analiza i Rozwój Grafu</div>
+                   <div className="w-1.5 h-1.5 rounded-full bg-[#355e3b] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                </button>
+                <button onClick={() => setSemanticSearchOpen(true)} className="btn-zinc group justify-between">
+                   <div className="flex items-center gap-2"><Search size={16} className="text-[#355e3b] group-hover:text-white transition-colors"/> Wyszukiwanie Semantyczne</div>
+                </button>
+                <button onClick={() => setShowStatsPanel(true)} className="btn-zinc group justify-between">
+                   <div className="flex items-center gap-2"><Activity size={16} className="text-[#355e3b] group-hover:text-white transition-colors"/> Graph Dashboard</div>
+                </button>
+                <button onClick={runRegionalAnalysis} className="btn-zinc group justify-between">
+                   <div className="flex items-center gap-2"><Map size={16} className="text-[#355e3b] group-hover:text-white transition-colors"/> Regional Analysis</div>
+                </button>
+                {regionalAnalysis && (
+                  <div className="px-3 py-2 bg-[#355e3b]/10 border-l-2 border-[#355e3b] text-xs animate-in fade-in slide-in-from-left-2">
+                    <div className="flex justify-between items-center">
+                       <span className="text-[#355e3b] font-bold">Isolation Index</span> 
+                       <span className="font-mono text-white bg-[#355e3b]/20 px-1 rounded">{(regionalAnalysis.isolationIndex * 100).toFixed(1)}%</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Refinement</label>
-              <button onClick={handleExpand} className="w-full btn-zinc border-blue-800 text-blue-300"><BrainCircuit size={16} /> AI Expand</button>
-              <button onClick={() => handleGroomDupes(true)} className="w-full btn-zinc border-amber-800 text-amber-300"><Scissors size={16} /> Semantic Grooming</button>
+            {/* AI Agents Section */}
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-[#355e3b] uppercase tracking-[0.2em] font-spectral opacity-80 pl-1">
+                AI Agents
+              </label>
+              <div className="grid grid-cols-1 gap-2">
+                 <button onClick={handleExpand} className="btn-zinc text-emerald-100/80 border-emerald-900/30 hover:border-emerald-500/50">
+                    <BrainCircuit size={16} className="text-emerald-500"/> AI Expand (Context)
+                 </button>
+                 <button onClick={() => handleGroomDupes(true)} className="btn-zinc text-amber-100/80 border-amber-900/30 hover:border-amber-500/50">
+                    <Scissors size={16} className="text-amber-500"/> Semantic Grooming
+                 </button>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Visualization</label>
-              <div className="flex items-center justify-between p-2 bg-zinc-800/50 rounded-md">
+            {/* Visualization Section */}
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-[#355e3b] uppercase tracking-[0.2em] font-spectral opacity-80 pl-1">
+                Visual Layers
+              </label>
+              
+              <div className="flex items-center justify-between px-3 py-2.5 bg-[#09090b] border border-[#355e3b]/20 rounded-sm hover:border-[#355e3b]/40 transition-colors">
                 <span className="text-sm text-zinc-300">Community Colors</span>
-                <button onClick={() => setCommunityColoring(!activeCommunityColoring)} className={`w-8 h-4 rounded-full relative transition-colors ${activeCommunityColoring ? 'bg-emerald-600' : 'bg-zinc-600'}`}>
-                  <div className={`w-2 h-2 bg-white rounded-full absolute top-1 transition-all ${activeCommunityColoring ? 'left-5' : 'left-1'}`}></div>
+                <button 
+                  onClick={() => setCommunityColoring(!activeCommunityColoring)} 
+                  className={`w-9 h-5 rounded-full relative transition-colors duration-300 ${activeCommunityColoring ? 'bg-[#355e3b]' : 'bg-zinc-800'}`}
+                >
+                  <div className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-all duration-300 shadow-md ${activeCommunityColoring ? 'left-5' : 'left-1'}`}></div>
+                </button>
+              </div>
+              
+              <div className="flex items-center justify-between px-3 py-2.5 bg-[#09090b] border border-[#355e3b]/20 rounded-sm hover:border-[#355e3b]/40 transition-colors">
+                <span className="text-sm text-zinc-300 flex items-center gap-2"><ShieldAlert size={14} className={showCertainty ? "text-[#b45309]" : "text-zinc-600"}/> Evidence Mode</span>
+                <button 
+                  onClick={() => setCertaintyMode(!showCertainty)} 
+                  className={`w-9 h-5 rounded-full relative transition-colors duration-300 ${showCertainty ? 'bg-[#b45309]' : 'bg-zinc-800'}`}
+                >
+                  <div className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-all duration-300 shadow-md ${showCertainty ? 'left-5' : 'left-1'}`}></div>
                 </button>
               </div>
             </div>
 
-            {/* Contextual Selection Panel */}
+            {/* Selection Panel */}
             {selectedNodeIds.length > 0 && (
-              <div className="p-4 bg-zinc-950/80 border border-zinc-700 rounded-lg space-y-3 animate-in slide-in-from-left-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-bold text-white">{selectedNodeIds.length} Selected</h3>
-                    <button onClick={clearSelection} className="text-zinc-500 hover:text-white"><X size={14}/></button>
+              <div className="p-4 bg-[#355e3b]/5 border border-[#355e3b]/30 rounded-sm space-y-3 animate-in slide-in-from-left-4 backdrop-blur-sm">
+                  <div className="flex justify-between items-center border-b border-[#355e3b]/20 pb-2">
+                    <h3 className="text-sm font-bold text-[#355e3b] font-spectral tracking-wide">{selectedNodeIds.length} Selected</h3>
+                    <button onClick={clearSelection} className="text-zinc-500 hover:text-white transition-colors"><X size={14}/></button>
                   </div>
                   
                   {selectedNodeIds.length === 1 && selectedNode && (
-                    <div className="space-y-2 text-xs text-zinc-400">
-                      <p className="font-bold text-white text-sm">{selectedNode.label}</p>
-                      <p>{selectedNode.description}</p>
+                    <div className="space-y-3 text-xs text-zinc-400">
+                      <p className="font-bold text-zinc-100 text-lg font-spectral leading-tight">{selectedNode.label}</p>
+                      <p className="italic border-l-2 border-[#b45309] pl-3 text-zinc-400">{selectedNode.description}</p>
                       
-                      {/* Metric Display in Tooltip Area */}
-                      <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-zinc-800">
-                        <div>DC: <span className="text-white">{(selectedNode.degreeCentrality || 0).toFixed(3)}</span></div>
-                        <div>PR: <span className="text-white">{(selectedNode.pagerank || 0).toFixed(3)}</span></div>
-                        <div className="col-span-2 text-emerald-400">
-                          Clust. Coeff: <span className="font-mono font-bold">{(selectedNode.clustering || 0).toFixed(3)}</span>
-                        </div>
-                         <div className="col-span-2 text-amber-400">
-                          Comm ID: <span className="font-mono font-bold">{selectedNode.louvainCommunity}</span>
-                        </div>
+                      <div className="grid grid-cols-2 gap-y-2 gap-x-4 pt-2 border-t border-[#355e3b]/10">
+                         <div className="flex justify-between"><span>Centrality:</span> <span className="text-white font-mono">{(selectedNode.degreeCentrality || 0).toFixed(2)}</span></div>
+                         <div className="flex justify-between"><span>PageRank:</span> <span className="text-white font-mono">{(selectedNode.pagerank || 0).toFixed(2)}</span></div>
+                         <div className="col-span-2 text-[#355e3b] flex justify-between font-bold bg-[#355e3b]/10 px-1.5 py-0.5 rounded">
+                           <span>Community:</span> <span>#{selectedNode.louvainCommunity}</span>
+                         </div>
                       </div>
                       
-                      <button onClick={handleDeepen} className="w-full btn-zinc text-xs mt-2 border-crimson-900/50 text-crimson-300 hover:bg-crimson-950/30">
-                         <BookOpenCheck size={12}/> Pogłębij Wiedzę (Agent)
-                      </button>
-
-                      <button onClick={() => setEditingNode(selectedNode.id)} className="w-full btn-zinc text-xs mt-2"><Edit2 size={12}/> Edit Node</button>
+                      <div className="grid grid-cols-2 gap-2 pt-2">
+                        <button onClick={handleDeepen} className="btn-zinc justify-center text-[#355e3b] border-[#355e3b]/40 hover:bg-[#355e3b] hover:text-white">
+                           <BookOpenCheck size={14}/> Research
+                        </button>
+                        <button onClick={() => setEditingNode(selectedNode.id)} className="btn-zinc justify-center">
+                           <Edit2 size={14}/> Edit
+                        </button>
+                      </div>
                     </div>
                   )}
 
                   {selectedNodeIds.length > 1 && (
                     <div className="space-y-2">
-                      <button onClick={bulkDeleteSelection} className="w-full btn-zinc bg-red-900/20 text-red-400 border-red-900/50 hover:bg-red-900/40"><Trash2 size={14}/> Delete All</button>
+                      <button onClick={bulkDeleteSelection} className="w-full btn-zinc bg-[#be123c]/10 text-[#be123c] border-[#be123c]/40 hover:bg-[#be123c] hover:text-white hover:border-[#be123c]"><Trash2 size={14}/> Delete Selection</button>
                     </div>
                   )}
               </div>
             )}
           </div>
           
-          <div className="mt-auto pt-4 border-t border-zinc-800 space-y-2">
-            <button onClick={handleExportObsidian} className="w-full btn-zinc text-xs"><FileJson size={14}/> Eksportuj do Obsidian</button>
+          <div className="mt-auto pt-6 border-t border-[#355e3b]/20 space-y-2">
+            <button onClick={handleExportJSON} className="w-full btn-zinc text-xs text-zinc-500 hover:text-white border-zinc-800"><FileJson size={14}/> Export Full JSON</button>
+            <button onClick={handleExportObsidian} className="w-full btn-zinc text-xs text-zinc-500 hover:text-white border-zinc-800"><FileJson size={14}/> Eksportuj do Obsidian</button>
+            <div className="text-center text-[10px] text-zinc-700 font-mono pt-2">v4.2.0 • Endecja GraphLab</div>
           </div>
         </div>
 
         {/* Drag Handle */}
         <div 
           onMouseDown={startResizing}
-          className={`absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-indigo-500/50 z-50 transition-colors ${isResizing ? 'bg-indigo-600' : 'bg-transparent'}`}
+          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-[#355e3b] z-50 transition-colors duration-300 ${isResizing ? 'bg-[#355e3b]' : 'bg-[#355e3b]/0'}`}
         />
       </div>
 
@@ -310,21 +401,21 @@ export const SidebarLeft: React.FC = () => {
 };
 
 const DupeModal = ({ candidates, onClose, onMerge }: any) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-    <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-      <div className="p-4 border-b border-zinc-800 flex justify-between items-center">
-        <h3 className="text-lg font-bold text-white">Semantic Review ({candidates.length})</h3>
-        <button onClick={onClose} className="text-zinc-400 hover:text-white"><X size={20}/></button>
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+    <div className="bg-[#0c0c0e] border border-[#355e3b]/30 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+      <div className="p-4 border-b border-[#355e3b]/20 flex justify-between items-center">
+        <h3 className="text-lg font-bold text-white font-spectral flex items-center gap-2"><Scissors size={18} className="text-[#355e3b]"/> Semantic Review ({candidates.length})</h3>
+        <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors"><X size={20}/></button>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {candidates.map((cand: any, i: number) => (
-          <div key={i} className="bg-zinc-950 p-4 rounded-lg border border-zinc-800 flex gap-4 items-center">
+          <div key={i} className="bg-[#09090b] p-4 rounded border border-zinc-800 flex gap-4 items-center group hover:border-[#355e3b]/40 transition-colors">
             <div className="flex-1 space-y-1">
-              <div className="flex justify-between"><span className="text-sm font-bold text-indigo-400">{cand.nodeA.label}</span></div>
-              <div className="flex justify-between"><span className="text-sm font-bold text-amber-400">{cand.nodeB.label}</span></div>
-              <div className="text-xs text-zinc-500">{cand.reason}</div>
+              <div className="flex justify-between"><span className="text-sm font-bold text-[#b45309]">{cand.nodeA.label}</span></div>
+              <div className="flex justify-between"><span className="text-sm font-bold text-[#b45309] opacity-70">{cand.nodeB.label}</span></div>
+              <div className="text-xs text-zinc-500 font-serif italic border-l-2 border-zinc-800 pl-2 mt-2">{cand.reason}</div>
             </div>
-            <button onClick={() => onMerge(cand)} className="btn-zinc text-emerald-400"><GitMerge size={14} /> Merge</button>
+            <button onClick={() => onMerge(cand)} className="btn-zinc text-[#355e3b] border-[#355e3b]/30 hover:bg-[#355e3b] hover:text-white"><GitMerge size={14} /> Merge</button>
           </div>
         ))}
       </div>

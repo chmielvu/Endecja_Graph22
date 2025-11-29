@@ -1,6 +1,6 @@
 
 import { create } from 'zustand';
-import { AppState, KnowledgeGraph, NodeData, ChatMessage, Toast, RegionalAnalysisResult, DuplicateCandidate, GraphPatch } from './types';
+import { AppState, KnowledgeGraph, NodeData, ChatMessage, Toast, RegionalAnalysisResult, DuplicateCandidate, GraphPatch, ResearchTask, GraphNode, GraphEdge } from './types';
 import { INITIAL_GRAPH } from './constants';
 import { enrichGraphWithMetrics, calculateRegionalMetrics } from './services/graphService';
 import { storage } from './services/storage';
@@ -12,11 +12,11 @@ interface HistoryState {
 
 interface Store extends AppState {
   initGraph: () => void;
-  loadFromStorage: () => Promise<void>;
+  loadFromStorage: () => Promise<KnowledgeGraph | null>;
   
   // Graph Mutation
   addNodesAndEdges: (nodes: any[], edges: any[]) => void;
-  applyPatch: (nodes: any[], edges: any[]) => void; // New robust patch applicator
+  applyPatch: (nodes: Partial<NodeData>[], edges: any[]) => void; // New robust patch applicator
   removeNode: (nodeId: string) => void;
   updateNode: (id: string, data: Partial<NodeData>) => void;
   mergeNodes: (keepId: string, dropId: string) => void;
@@ -31,10 +31,13 @@ interface Store extends AppState {
   setFilterYear: (year: number | null) => void;
   toggleSidebar: () => void;
   setCommunityColoring: (active: boolean) => void;
+  setCertaintyMode: (active: boolean) => void;
   runRegionalAnalysis: () => void;
   setShowStatsPanel: (show: boolean) => void;
   setSemanticSearchOpen: (open: boolean) => void;
   setPendingPatch: (patch: GraphPatch | null) => void;
+  addResearchTask: (task: ResearchTask) => void;
+  updateResearchTask: (id: string, updates: Partial<ResearchTask>) => void;
   
   // UI
   setEditingNode: (id: string | null) => void;
@@ -61,8 +64,10 @@ export const useStore = create<Store>((set, get) => ({
   editingNodeId: null,
   deepeningNodeId: null,
   pendingPatch: null,
+  activeResearchTasks: [],
   metricsCalculated: false,
   activeCommunityColoring: true,
+  showCertainty: false,
   minDegreeFilter: 0,
   isSidebarOpen: true,
   timelineYear: null,
@@ -131,33 +136,49 @@ export const useStore = create<Store>((set, get) => ({
     storage.save(next);
   },
 
-  initGraph: () => {
-    get().loadFromStorage().then(() => {
-      const { graph } = get();
-      if (graph.nodes.length === 0) {
-        console.log("Loading Initial Data...");
+  initGraph: async () => {
+    try {
+      const currentVersion = INITIAL_GRAPH.meta?.version || "1.0";
+      const stored = await get().loadFromStorage();
+      
+      // Auto-hydrate if empty OR if version mismatch (forced upgrade)
+      if (!stored || (stored.meta?.version !== currentVersion)) {
+        console.log(`Hydrating Initial Graph. Stored: ${stored?.meta?.version}, Current: ${currentVersion}`);
+        // If enrichment fails, this might throw
         const enriched = enrichGraphWithMetrics(INITIAL_GRAPH);
         set({ graph: enriched, filteredGraph: enriched, metricsCalculated: true });
-        storage.save(enriched);
+        get().addToast({ title: 'Database Updated', description: `Loaded Knowledge Base v${currentVersion}`, type: 'success' });
+        storage.save(enriched, currentVersion);
+      } else {
+         // Load from storage if version matches
+         set({ graph: stored, filteredGraph: stored, metricsCalculated: true });
       }
-    });
-    
-    // Auto-save
-    setInterval(() => {
-      const { graph } = get();
-      if (graph.nodes.length > 0) storage.save(graph);
-    }, 10000);
+      
+      // Auto-save loop
+      setInterval(() => {
+        const { graph } = get();
+        if (graph.nodes.length > 0) storage.save(graph);
+      }, 10000);
+
+    } catch (e: any) {
+      console.error("Initialization Error (using raw fallback):", e);
+      get().addToast({ title: 'System Notice', description: `Loaded basic graph due to metric error.`, type: 'warning' });
+      // Fallback to raw initial graph without metrics if enrichment fails
+      set({ graph: INITIAL_GRAPH, filteredGraph: INITIAL_GRAPH, metricsCalculated: false });
+    }
   },
 
   loadFromStorage: async () => {
     try {
       const data = await storage.load();
       if (data) {
-        set({ graph: data.graph, filteredGraph: data.graph, metricsCalculated: true });
-        get().addToast({ title: 'Loaded from Disk', description: `Restored ${data.graph.nodes.length} nodes from ${new Date(data.savedAt).toLocaleTimeString()}`, type: 'success' });
+        // Just return the graph, initGraph decides whether to use it
+        return { ...data.graph, meta: { ...data.graph.meta, version: data.version } };
       }
+      return null;
     } catch (e) {
       console.error("Failed to load from storage", e);
+      return null;
     }
   },
 
@@ -179,17 +200,28 @@ export const useStore = create<Store>((set, get) => ({
     const { graph } = get();
 
     // 1. Process Nodes (Upsert)
-    const existingNodeMap = new Map(graph.nodes.map(n => [n.data.id, n]));
+    const existingNodeMap = new Map<string, GraphNode>(graph.nodes.map(n => [n.data.id, n]));
     
     patchNodes.forEach(pn => {
-      const year = typeof pn.dates === 'string' ? parseInt(pn.dates.substr(0,4)) || 1900 : (pn.year || 1900);
+      if (!pn.id) return;
+      
+      let year = pn.year;
+      if (!year && typeof pn.dates === 'string') {
+        const match = pn.dates.match(/\d{4}/);
+        if (match && match.length > 0) year = parseInt(match[0]);
+      }
       
       if (existingNodeMap.has(pn.id)) {
         // Update Existing
         const existing = existingNodeMap.get(pn.id)!;
         existingNodeMap.set(pn.id, {
           ...existing,
-          data: { ...existing.data, ...pn, year: year || existing.data.year }
+          data: { 
+            ...existing.data, 
+            ...pn,
+            id: pn.id, // Ensure ID is preserved
+            year: year || existing.data.year 
+          } as NodeData
         });
       } else {
         // Create New
@@ -204,13 +236,13 @@ export const useStore = create<Store>((set, get) => ({
             importance: 0.5,
             region: pn.region || 'Unknown',
             certainty: pn.certainty || 'confirmed'
-          }
-        } as any);
+          } as NodeData
+        });
       }
     });
 
     // 2. Process Edges
-    const newEdges = patchEdges.map(e => ({
+    const newEdges: GraphEdge[] = patchEdges.map(e => ({
       data: {
         id: e.id || `edge_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
         source: e.source,
@@ -227,9 +259,24 @@ export const useStore = create<Store>((set, get) => ({
       existingNodeMap.has(e.data.source) && existingNodeMap.has(e.data.target)
     );
 
-    const updatedGraph = {
+    // Merge edges, avoiding exact duplicates (same source, target, and label)
+    const existingEdges = graph.edges;
+    const finalEdges = [...existingEdges];
+    
+    validNewEdges.forEach(newEdge => {
+      const isDuplicate = existingEdges.some(ex => 
+        ex.data.source === newEdge.data.source && 
+        ex.data.target === newEdge.data.target && 
+        ex.data.label === newEdge.data.label
+      );
+      if (!isDuplicate) {
+        finalEdges.push(newEdge);
+      }
+    });
+
+    const updatedGraph: KnowledgeGraph = {
       nodes: Array.from(existingNodeMap.values()),
-      edges: [...graph.edges, ...validNewEdges]
+      edges: finalEdges
     };
 
     const enriched = enrichGraphWithMetrics(updatedGraph);
@@ -272,19 +319,51 @@ export const useStore = create<Store>((set, get) => ({
     storage.save(enriched);
   },
 
+  // Smart Merge: Preserves data from the dropped node if missing in kept node
   mergeNodes: (keepId, dropId) => {
     get().pushHistory();
     const { graph } = get();
+    
+    const keepNode = graph.nodes.find(n => n.data.id === keepId);
+    const dropNode = graph.nodes.find(n => n.data.id === dropId);
+    
+    if (!keepNode || !dropNode) return;
+
+    // Merge Logic: Prefer "Unknown" to be overwritten by specific data
+    const newData = { ...keepNode.data };
+    
+    if ((!newData.region || newData.region === 'Unknown') && dropNode.data.region && dropNode.data.region !== 'Unknown') {
+       newData.region = dropNode.data.region;
+    }
+    
+    if (!newData.description && dropNode.data.description) {
+       newData.description = dropNode.data.description;
+    } else if (dropNode.data.description && newData.description && dropNode.data.description.length > newData.description.length) {
+       // Simple heuristic: keep longer description
+       newData.description = dropNode.data.description;
+    }
+    
+    if (!newData.dates && dropNode.data.dates) {
+       newData.dates = dropNode.data.dates;
+       newData.year = dropNode.data.year;
+    }
+
     const updatedEdges = graph.edges.map(e => {
-      let newData = { ...e.data };
-      if (newData.source === dropId) newData.source = keepId;
-      if (newData.target === dropId) newData.target = keepId;
-      return { data: newData };
+      let edgeData = { ...e.data };
+      if (edgeData.source === dropId) edgeData.source = keepId;
+      if (edgeData.target === dropId) edgeData.target = keepId;
+      return { data: edgeData };
     });
-    const updatedNodes = graph.nodes.filter(n => n.data.id !== dropId);
+    
+    // Update the kept node
+    const updatedNodes = graph.nodes
+      .filter(n => n.data.id !== dropId)
+      .map(n => n.data.id === keepId ? { ...n, data: newData } : n);
+      
     const finalEdges = updatedEdges.filter(e => e.data.source !== e.data.target);
     const enriched = enrichGraphWithMetrics({ nodes: updatedNodes, edges: finalEdges });
     set({ graph: enriched, filteredGraph: enriched });
+    get().addToast({ title: 'Merged Nodes', description: `Merged ${dropNode.data.label} into ${keepNode.data.label}`, type: 'success' });
     storage.save(enriched);
   },
 
@@ -321,10 +400,15 @@ export const useStore = create<Store>((set, get) => ({
   setThinking: (val) => set({ isThinking: val }),
   addMessage: (msg) => set(state => ({ messages: [...state.messages, msg] })),
   setCommunityColoring: (val) => set({ activeCommunityColoring: val }),
+  setCertaintyMode: (val) => set({ showCertainty: val }),
   setFilterYear: (y) => set({ timelineYear: y }),
   setShowStatsPanel: (show) => set({ showStatsPanel: show }),
   setSemanticSearchOpen: (open) => set({ isSemanticSearchOpen: open }),
   setPendingPatch: (patch) => set({ pendingPatch: patch }),
   
   setDeepeningNode: (id) => set({ deepeningNodeId: id }),
+  addResearchTask: (task) => set(state => ({ activeResearchTasks: [task, ...state.activeResearchTasks] })),
+  updateResearchTask: (id, updates) => set(state => ({ 
+    activeResearchTasks: state.activeResearchTasks.map(t => t.id === id ? { ...t, ...updates } : t) 
+  })),
 }));

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../store';
 import { getEmbedding, cosineSimilarity } from '../services/embeddingService';
@@ -53,10 +52,10 @@ export const SemanticSearch: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 h-[300px] bg-zinc-950 border-t border-zinc-800 z-50 flex flex-col shadow-[0_-10px_40px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom duration-300">
-      <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
-         <h3 className="font-bold text-white flex items-center gap-2">
-            <Search size={18} className="text-indigo-400" /> Wyszukiwanie Semantyczne (Vector)
+    <div className="fixed bottom-0 left-0 right-0 h-[300px] bg-zinc-950 border-t border-[#b45309]/30 z-50 flex flex-col shadow-[0_-10px_40px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom duration-300">
+      <div className="p-4 border-b border-[#b45309]/20 flex justify-between items-center bg-zinc-900/50">
+         <h3 className="font-bold text-white flex items-center gap-2 font-spectral">
+            <Search size={18} className="text-[#b45309]" /> Wyszukiwanie Semantyczne (Vector)
          </h3>
          <button onClick={() => setSemanticSearchOpen(false)} className="text-zinc-500 hover:text-white"><X size={20}/></button>
       </div>
@@ -67,12 +66,12 @@ export const SemanticSearch: React.FC = () => {
           onChange={e => setQuery(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSearch()}
           placeholder="Opisz czego szukasz (np. 'organizacje walczące z sanacją')..."
-          className="flex-1 bg-zinc-900 border border-zinc-700 rounded-md px-4 py-2 text-white focus:border-indigo-500 outline-none"
+          className="flex-1 bg-zinc-900 border border-zinc-700 rounded-md px-4 py-2 text-white focus:border-[#b45309] outline-none"
         />
         <button 
            onClick={handleSearch} 
            disabled={searching}
-           className="px-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md font-bold disabled:opacity-50 flex items-center gap-2"
+           className="px-6 bg-[#355e3b] hover:bg-[#2a4a2f] text-white rounded-md font-bold disabled:opacity-50 flex items-center gap-2 border border-[#355e3b]"
         >
           {searching ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
           Szukaj
@@ -81,10 +80,10 @@ export const SemanticSearch: React.FC = () => {
 
       <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 bg-black/20">
          {results.map(({ node, score }) => (
-            <div key={node.data.id} onClick={() => handleSelect(node.data.id)} className="bg-zinc-900 p-3 rounded border border-zinc-800 hover:border-indigo-500 cursor-pointer group transition-colors">
+            <div key={node.data.id} onClick={() => handleSelect(node.data.id)} className="bg-zinc-900 p-3 rounded border border-zinc-800 hover:border-[#b45309] cursor-pointer group transition-colors">
                <div className="flex justify-between items-start">
-                  <span className="font-bold text-white text-sm group-hover:text-indigo-300">{node.data.label}</span>
-                  <span className="text-xs font-mono text-emerald-500">{(score * 100).toFixed(1)}%</span>
+                  <span className="font-bold text-white text-sm group-hover:text-[#b45309]">{node.data.label}</span>
+                  <span className="text-xs font-mono text-[#355e3b]">{(score * 100).toFixed(1)}%</span>
                </div>
                <div className="text-xs text-zinc-500 mt-1 line-clamp-2">{node.data.description}</div>
             </div>

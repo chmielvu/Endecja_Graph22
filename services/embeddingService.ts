@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 
 const API_KEY = process.env.API_KEY || '';
@@ -29,6 +30,34 @@ export async function getEmbedding(text: string): Promise<number[]> {
     console.warn("Embedding failed for text:", text.substring(0, 20), error);
     return [];
   }
+}
+
+// Batch processing with concurrency control (simulated batching since API is single)
+export async function getEmbeddingsBatch(texts: string[], concurrency = 5): Promise<Array<number[]>> {
+  const results: Array<number[]> = new Array(texts.length).fill([]);
+  const queue = texts.map((text, index) => ({ text, index }));
+  
+  const processItem = async (item: { text: string, index: number }) => {
+    try {
+      results[item.index] = await getEmbedding(item.text);
+    } catch (e) {
+      console.warn(`Failed to embed item ${item.index}`, e);
+      results[item.index] = [];
+    }
+  };
+
+  const workers = [];
+  for (let i = 0; i < concurrency; i++) {
+    workers.push(async () => {
+      while (queue.length > 0) {
+        const item = queue.shift();
+        if (item) await processItem(item);
+      }
+    });
+  }
+
+  await Promise.all(workers.map(w => w()));
+  return results;
 }
 
 export function cosineSimilarity(vecA: number[], vecB: number[]): number {

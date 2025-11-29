@@ -1,3 +1,4 @@
+
 import { openDB } from 'idb';
 import { KnowledgeGraph } from '../types';
 
@@ -15,18 +16,19 @@ const initDB = async () => {
 };
 
 export const storage = {
-  async save(graph: KnowledgeGraph) {
+  async save(graph: KnowledgeGraph, version?: string) {
     const db = await initDB();
     await db.put(STORE_NAME, { 
       id: 'current', 
       graph, 
+      version: version || graph.meta?.version || '1.0',
       savedAt: Date.now() 
     });
   },
 
-  async load(): Promise<{ graph: KnowledgeGraph; savedAt: number } | null> {
+  async load(): Promise<{ graph: KnowledgeGraph; version: string; savedAt: number } | null> {
     const db = await initDB();
     const record = await db.get(STORE_NAME, 'current');
-    return record ? { graph: record.graph, savedAt: record.savedAt } : null;
+    return record ? { graph: record.graph, version: record.version || '1.0', savedAt: record.savedAt } : null;
   }
 };

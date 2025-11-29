@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useStore } from '../store';
 
@@ -10,10 +9,10 @@ export const Timeline: React.FC = () => {
   const MAX_YEAR = 1950;
 
   return (
-    <div className="h-16 bg-zinc-900 border-t border-zinc-800 flex items-center px-6 gap-6 shrink-0 relative z-20">
+    <div className="h-16 bg-[#0c0c0e] border-t border-[#b45309]/20 flex items-center px-6 gap-6 shrink-0 relative z-20">
       <button 
         onClick={() => setFilterYear(null)}
-        className={`text-xs font-mono px-3 py-1 rounded transition-colors whitespace-nowrap border ${timelineYear === null ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-transparent text-zinc-500 border-zinc-700 hover:border-zinc-500'}`}
+        className={`text-xs font-mono px-3 py-1 rounded-sm transition-colors whitespace-nowrap border ${timelineYear === null ? 'bg-[#355e3b] text-white border-[#355e3b]' : 'bg-transparent text-zinc-500 border-zinc-700 hover:border-[#b45309] hover:text-[#b45309]'}`}
       >
         ALL TIME
       </button>
@@ -23,7 +22,7 @@ export const Timeline: React.FC = () => {
       <div className="flex-1 flex flex-col justify-center">
         <div className="flex justify-between text-[10px] text-zinc-500 font-mono mb-2 uppercase">
            <span>{MIN_YEAR}</span>
-           {timelineYear && <span className="text-indigo-400 font-bold text-sm">{timelineYear}</span>}
+           {timelineYear && <span className="text-[#b45309] font-bold text-sm font-spectral">{timelineYear}</span>}
            <span>{MAX_YEAR}</span>
         </div>
         
@@ -34,7 +33,7 @@ export const Timeline: React.FC = () => {
           step={1}
           value={timelineYear || 1900}
           onChange={(e) => setFilterYear(parseInt(e.target.value))}
-          className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400"
+          className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[#b45309] hover:accent-[#9a4507]"
         />
         
         {/* Ticks */}
