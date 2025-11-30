@@ -1,9 +1,8 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import cytoscape from 'cytoscape';
 import cola from 'cytoscape-cola';
 import { useStore } from '../store';
-import { COLORS, COMMUNITY_COLORS } from '../constants';
+import { COLORS, COMMUNITY_COLORS, THEME } from '../constants';
 import { NodeData } from '../types';
 import { generateNodeDeepening } from '../services/geminiService';
 import { BookOpenCheck, X } from 'lucide-react';
@@ -90,14 +89,14 @@ export const GraphCanvas: React.FC = () => {
           selector: 'node',
           style: {
             'label': 'data(label)',
-            'color': '#f4f4f5',
+            'color': THEME.colors.textMain,
             'font-family': 'Spectral, serif',
             'font-weight': 'bold',
             'font-size': '14px',
             'text-valign': 'bottom',
             'text-margin-y': 6,
             'text-background-opacity': 0.8,
-            'text-background-color': '#09090b',
+            'text-background-color': THEME.colors.background,
             'text-background-padding': '4px',
             'text-background-shape': 'roundrectangle',
             'width': (ele: any) => {
@@ -112,7 +111,7 @@ export const GraphCanvas: React.FC = () => {
                const kCore = ele.data('kCore') || 0;
                return kCore * 2;
             },
-            'border-color': '#b45309', // Gold tint default
+            'border-color': THEME.colors.archivalGold, 
             'border-opacity': 0.8,
             'transition-property': 'background-color, width, height, border-width, opacity, border-color, border-style',
             'transition-duration': 500
@@ -123,10 +122,10 @@ export const GraphCanvas: React.FC = () => {
           selector: ':parent',
           style: {
              'background-opacity': 0.05,
-             'background-color': '#b45309', // Subtle Gold wash
+             'background-color': THEME.colors.archivalGold,
              'border-width': 2,
              'border-style': 'dashed',
-             'border-color': '#b45309',
+             'border-color': THEME.colors.archivalGold,
              'border-opacity': 0.4,
              'label': 'data(label)',
              'font-family': 'Spectral, serif',
@@ -135,7 +134,7 @@ export const GraphCanvas: React.FC = () => {
              'text-margin-y': -10,
              'text-transform': 'uppercase',
              'font-size': '20px',
-             'color': '#b45309',
+             'color': THEME.colors.archivalGold,
              'text-background-opacity': 0, // No BG for parent label
              'shape': 'roundrectangle'
           }
@@ -148,8 +147,8 @@ export const GraphCanvas: React.FC = () => {
               // Base 1.5, scale up to 5 based on weight
               return Math.min(5, 1.5 + (weight * 50));
             },
-            'line-color': (ele) => ele.data('sign') === 'negative' ? '#be123c' : '#355e3b', // Crimson (neg) vs OWP Green (pos)
-            'target-arrow-color': (ele) => ele.data('sign') === 'negative' ? '#be123c' : '#355e3b',
+            'line-color': (ele) => ele.data('sign') === 'negative' ? THEME.colors.crimson : THEME.colors.owpGreen,
+            'target-arrow-color': (ele) => ele.data('sign') === 'negative' ? THEME.colors.crimson : THEME.colors.owpGreen,
             'target-arrow-shape': 'triangle',
             'curve-style': 'bezier',
             'opacity': (ele: any) => {
@@ -161,8 +160,8 @@ export const GraphCanvas: React.FC = () => {
             'text-margin-y': -8,
             'font-size': '9px',
             'font-family': 'Inter, sans-serif',
-            'color': '#a1a1aa',
-            'text-background-color': '#09090b',
+            'color': THEME.colors.textDim,
+            'text-background-color': THEME.colors.background,
             'text-background-opacity': 0.8,
             'text-background-padding': '2px',
             'text-background-shape': 'roundrectangle'
@@ -172,8 +171,8 @@ export const GraphCanvas: React.FC = () => {
           selector: 'edge:selected',
           style: {
              'label': 'data(label)',
-             'line-color': '#b45309',
-             'target-arrow-color': '#b45309',
+             'line-color': THEME.colors.archivalGold,
+             'target-arrow-color': THEME.colors.archivalGold,
              'width': 3,
              'opacity': 1,
              'color': '#fff'
@@ -183,9 +182,9 @@ export const GraphCanvas: React.FC = () => {
           selector: ':selected',
           style: {
             'border-width': 4,
-            'border-color': '#b45309', // Gold for selection
-            'background-color': '#b45309',
-            'text-background-color': '#b45309',
+            'border-color': THEME.colors.archivalGold,
+            'background-color': THEME.colors.archivalGold,
+            'text-background-color': THEME.colors.archivalGold,
             'text-background-opacity': 1,
             'color': '#000'
           }
@@ -206,7 +205,7 @@ export const GraphCanvas: React.FC = () => {
               'text-background-opacity': 1,
               'text-background-color': '#0c0c0e',
               'text-border-width': 1,
-              'text-border-color': '#355e3b',
+              'text-border-color': THEME.colors.owpGreen,
               'text-border-opacity': 0.4
            }
         }
@@ -542,8 +541,8 @@ export const GraphCanvas: React.FC = () => {
             if (data.id === deepeningNodeId) {
                 // Target: Crimson, Highlighted
                 ele.style({
-                    'background-color': '#be123c',
-                    'border-color': '#be123c',
+                    'background-color': THEME.colors.crimson,
+                    'border-color': THEME.colors.crimson,
                     'border-width': 8,
                     'border-style': 'double',
                     'opacity': 1,
@@ -553,7 +552,7 @@ export const GraphCanvas: React.FC = () => {
                 // Neighbor: Gold, Dashed
                 ele.style({
                     'background-color': color,
-                    'border-color': '#b45309',
+                    'border-color': THEME.colors.archivalGold,
                     'border-width': 4,
                     'border-style': 'dashed',
                     'opacity': 1,
@@ -587,7 +586,7 @@ export const GraphCanvas: React.FC = () => {
                      const cert = data.certainty;
                      if (cert === 'disputed') {
                         ele.style('border-style', 'dashed');
-                        ele.style('border-color', '#be123c'); 
+                        ele.style('border-color', THEME.colors.crimson); 
                      } else if (cert === 'alleged') {
                         ele.style('border-style', 'dotted');
                      }
@@ -674,7 +673,7 @@ export const GraphCanvas: React.FC = () => {
         >
           <button 
             onClick={() => handleDeepenContext(contextMenu.nodeId)}
-            className="w-full px-4 py-2 text-left text-sm text-white hover:bg-[#355e3b] hover:text-white flex items-center gap-2 transition-colors"
+            className="w-full px-4 py-2 text-left text-sm text-white hover:bg-owp-green hover:text-white flex items-center gap-2 transition-colors"
           >
             <BookOpenCheck size={14} /> Research Deeply
           </button>

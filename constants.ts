@@ -1,5 +1,17 @@
-
 import { KnowledgeGraph, GraphNode, GraphEdge } from './types';
+
+// Theme Constants (Must match index.html Tailwind config)
+export const THEME = {
+  colors: {
+    background: '#09090b',
+    zinc900: '#18181b',
+    owpGreen: '#355e3b',
+    archivalGold: '#b45309',
+    crimson: '#be123c',
+    textMain: '#f4f4f5',
+    textDim: '#a1a1aa'
+  }
+};
 
 // Merged Data: Full JSON Seed + Regional Expansion
 const DATA = {
@@ -883,8 +895,8 @@ export const COLORS = {
 
 // Tier-4 Palette: Gold -> Crimson -> Navy (Endecja Historical)
 export const COMMUNITY_COLORS = [
-  '#b45309', // Gold (Amber-700)
-  '#be123c', // Crimson (Rose-700)
+  THEME.colors.archivalGold,
+  THEME.colors.crimson,
   '#1e3a8a', // Navy (Blue-900)
   '#c2410c', // Orange-700
   '#0f766e', // Teal-700

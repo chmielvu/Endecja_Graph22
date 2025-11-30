@@ -1,28 +1,31 @@
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Spectral:wght@400;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   body {
-    @apply bg-[#09090b] text-zinc-100 overflow-hidden selection:bg-[#355e3b] selection:text-white;
+    @apply bg-[#09090b] text-zinc-100 overflow-hidden selection:bg-owp-green selection:text-white;
   }
 }
 
-/* Custom Scrollbar for Historical Archival Theme */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #0c0c0e;
-}
-::-webkit-scrollbar-thumb {
-  background: #355e3b;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #2f5335;
+/* Archival Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0c0c0e; }
+::-webkit-scrollbar-thumb { background: #1e3a25; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #355e3b; }
+
+.font-spectral { font-family: 'Spectral', serif; }
+
+@layer components {
+  .btn-zinc {
+    @apply flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 border border-owp-green/30 bg-owp-green/10 rounded-sm transition-all duration-200 font-sans;
+  }
+  .btn-zinc:hover {
+    @apply bg-owp-green/25 border-owp-green text-white shadow-[0_0_10px_rgba(53,94,59,0.1)];
+  }
 }
 
 /* Animations */
