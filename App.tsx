@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { SidebarLeft } from './components/SidebarLeft';
 import { SidebarRight } from './components/SidebarRight';
@@ -9,10 +10,10 @@ import { SemanticSearch } from './components/SemanticSearch';
 import { PatchReviewModal } from './components/PatchReviewModal';
 import { ResearchDashboard } from './components/ResearchDashboard';
 import { useStore } from './store';
-import { X, CheckCircle, AlertCircle, Info, PanelLeftOpen } from 'lucide-react';
+import { X, CheckCircle, AlertCircle, Info, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 
 function App() {
-  const { initGraph, toasts, removeToast, toggleSidebar, isSidebarOpen } = useStore();
+  const { initGraph, toasts, removeToast, toggleSidebar, isSidebarOpen, isRightSidebarOpen, toggleRightSidebar } = useStore();
 
   useEffect(() => {
     initGraph();
@@ -46,7 +47,7 @@ function App() {
         }
       `}</style>
 
-      {/* Floating Toggle Button (Visible only when Sidebar is closed) */}
+      {/* Floating Toggle Button Left (Visible only when Sidebar is closed) */}
       {!isSidebarOpen && (
         <button 
           onClick={toggleSidebar}
@@ -54,6 +55,17 @@ function App() {
           title="Open Sidebar"
         >
           <PanelLeftOpen size={20} />
+        </button>
+      )}
+
+      {/* Floating Toggle Button Right (Visible only when Chat is closed) */}
+      {!isRightSidebarOpen && (
+        <button 
+          onClick={toggleRightSidebar}
+          className="absolute top-4 right-4 z-50 p-2 bg-[#0c0c0e] border border-[#b45309]/50 text-[#b45309] rounded shadow-lg hover:bg-[#b45309] hover:text-white transition-all duration-300"
+          title="Open Dmowski Chat"
+        >
+          <PanelRightOpen size={20} />
         </button>
       )}
 

@@ -1,45 +1,135 @@
-import React from 'react';
+
+import React, { useEffect, useRef } from 'react';
 import { useStore } from '../store';
+import { Play, Pause, Rewind } from 'lucide-react';
 
 export const Timeline: React.FC = () => {
-  const { timelineYear, setFilterYear } = useStore();
+  const { timelineYear, setFilterYear, isPlaying, setIsPlaying } = useStore();
+  const intervalRef = useRef<number | null>(null);
   
-  // Continuous range 1850 - 1950
-  const MIN_YEAR = 1850;
-  const MAX_YEAR = 1950;
+  // Continuous range 1880 - 1945 (Endecja Peak Era)
+  const MIN_YEAR = 1880;
+  const MAX_YEAR = 1945;
+
+  useEffect(() => {
+    if (isPlaying) {
+      if (timelineYear === null) setFilterYear(MIN_YEAR);
+      
+      intervalRef.current = window.setInterval(() => {
+        setFilterYear((prev) => {
+           // If we just started, prev might be null
+           const current = prev || MIN_YEAR;
+           if (current >= MAX_YEAR) {
+             setIsPlaying(false);
+             return MAX_YEAR;
+           }
+           return current + 1;
+        });
+      }, 800); // 800ms per year
+    } else {
+      if (intervalRef.current) {
+         clearInterval(intervalRef.current);
+         intervalRef.current = null;
+      }
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [isPlaying, timelineYear, setFilterYear, setIsPlaying]);
+
+  const handlePlayToggle = () => {
+    if (timelineYear && timelineYear >= MAX_YEAR) {
+        setFilterYear(MIN_YEAR); // Restart if at end
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  const resetTimeline = () => {
+    setIsPlaying(false);
+    setFilterYear(null);
+  };
 
   return (
-    <div className="h-16 bg-[#0c0c0e] border-t border-[#b45309]/20 flex items-center px-6 gap-6 shrink-0 relative z-20">
-      <button 
-        onClick={() => setFilterYear(null)}
-        className={`text-xs font-mono px-3 py-1 rounded-sm transition-colors whitespace-nowrap border ${timelineYear === null ? 'bg-[#355e3b] text-white border-[#355e3b]' : 'bg-transparent text-zinc-500 border-zinc-700 hover:border-[#b45309] hover:text-[#b45309]'}`}
-      >
-        ALL TIME
-      </button>
+    <div className="h-16 bg-[#0c0c0e] border-t border-[#b45309]/20 flex items-center px-4 gap-4 shrink-0 relative z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.5)]">
+      
+      {/* Controls */}
+      <div className="flex items-center gap-2">
+         <button 
+           onClick={handlePlayToggle}
+           className={`p-2 rounded-full border transition-all ${isPlaying 
+             ? 'bg-[#be123c]/10 text-[#be123c] border-[#be123c]/50 animate-pulse' 
+             : 'bg-[#355e3b]/10 text-[#355e3b] border-[#355e3b]/50 hover:bg-[#355e3b] hover:text-white'}`}
+           title={isPlaying ? "Pause History" : "Play History"}
+         >
+           {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
+         </button>
+         
+         <button 
+           onClick={resetTimeline}
+           className={`text-xs font-mono px-3 py-1.5 rounded-sm transition-colors whitespace-nowrap border flex items-center gap-2 ${timelineYear === null ? 'bg-[#b45309] text-white border-[#b45309]' : 'bg-transparent text-zinc-500 border-zinc-700 hover:border-zinc-500'}`}
+         >
+           <Rewind size={12} /> ALL TIME
+         </button>
+      </div>
       
       <div className="w-[1px] h-8 bg-zinc-800 mx-2"></div>
 
+      {/* Slider Area */}
       <div className="flex-1 flex flex-col justify-center">
-        <div className="flex justify-between text-[10px] text-zinc-500 font-mono mb-2 uppercase">
+        <div className="flex justify-between text-[10px] text-zinc-500 font-mono mb-2 uppercase relative">
            <span>{MIN_YEAR}</span>
-           {timelineYear && <span className="text-[#b45309] font-bold text-sm font-spectral">{timelineYear}</span>}
+           
+           {/* Floating Year Indicator */}
+           <div 
+             className="absolute top-0 transform -translate-x-1/2 transition-all duration-300"
+             style={{ 
+               left: timelineYear 
+                 ? `${((timelineYear - MIN_YEAR) / (MAX_YEAR - MIN_YEAR)) * 100}%` 
+                 : '50%',
+               opacity: timelineYear ? 1 : 0
+             }}
+           >
+              <span className="text-[#b45309] font-bold text-lg font-spectral bg-[#0c0c0e] px-2 border border-[#b45309]/30 rounded">
+                {timelineYear}
+              </span>
+           </div>
+
            <span>{MAX_YEAR}</span>
         </div>
         
-        <input 
-          type="range"
-          min={MIN_YEAR}
-          max={MAX_YEAR}
-          step={1}
-          value={timelineYear || 1900}
-          onChange={(e) => setFilterYear(parseInt(e.target.value))}
-          className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[#b45309] hover:accent-[#9a4507]"
-        />
+        <div className="relative w-full h-2 flex items-center">
+          {/* Track Background */}
+          <div className="absolute w-full h-1 bg-zinc-800 rounded-lg"></div>
+          
+          {/* Progress Bar */}
+          <div 
+            className="absolute h-1 bg-[#b45309] rounded-l-lg transition-all duration-100"
+            style={{ width: timelineYear ? `${((timelineYear - MIN_YEAR) / (MAX_YEAR - MIN_YEAR)) * 100}%` : '100%' }}
+          ></div>
+
+          <input 
+            type="range"
+            min={MIN_YEAR}
+            max={MAX_YEAR}
+            step={1}
+            value={timelineYear || MAX_YEAR} // Default to max when null for UI consistency
+            onChange={(e) => {
+               setIsPlaying(false);
+               setFilterYear(parseInt(e.target.value));
+            }}
+            className="w-full h-4 bg-transparent appearance-none cursor-pointer z-10 
+              [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
+              [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white 
+              [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#b45309] 
+              [&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(180,83,9,0.5)]
+              hover:[&::-webkit-slider-thumb]:scale-110 transition-all"
+          />
+        </div>
         
         {/* Ticks */}
-        <div className="w-full flex justify-between mt-1 px-1">
-          {Array.from({ length: 11 }).map((_, i) => (
-             <div key={i} className="w-[1px] h-1 bg-zinc-700"></div>
+        <div className="w-full flex justify-between mt-1 px-1 opacity-30">
+          {Array.from({ length: 13 }).map((_, i) => (
+             <div key={i} className={`w-[1px] ${i % 2 === 0 ? 'h-2 bg-zinc-500' : 'h-1 bg-zinc-700'}`}></div>
           ))}
         </div>
       </div>

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import cytoscape from 'cytoscape';
 import cola from 'cytoscape-cola';
@@ -18,6 +19,9 @@ export const GraphCanvas: React.FC = () => {
     filteredGraph, 
     activeCommunityColoring, 
     showCertainty,
+    isGroupedByRegion,
+    activeLayout,
+    layoutParams,
     selectedNodeIds, 
     toggleNodeSelection, 
     clearSelection, 
@@ -32,6 +36,7 @@ export const GraphCanvas: React.FC = () => {
   } = useStore();
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; data: NodeData } | null>(null);
 
   // Deepen Logic (Context Menu Version)
   const handleDeepenContext = async (nodeId: string) => {
@@ -97,28 +102,51 @@ export const GraphCanvas: React.FC = () => {
             'text-background-shape': 'roundrectangle',
             'width': (ele: any) => {
                const pr = ele.data('pagerank') || 0.01;
-               return 10 + (pr * 140); 
+               return 15 + (pr * 160); // Base size increased slightly
             },
             'height': (ele: any) => {
                const pr = ele.data('pagerank') || 0.01;
-               return 10 + (pr * 140);
+               return 15 + (pr * 160);
             },
             'border-width': (ele: any) => {
-               const clustering = ele.data('clustering') || 0;
-               return clustering * 8;
+               const kCore = ele.data('kCore') || 0;
+               return kCore * 2;
             },
             'border-color': '#b45309', // Gold tint default
-            'border-opacity': 0.6,
+            'border-opacity': 0.8,
             'transition-property': 'background-color, width, height, border-width, opacity, border-color, border-style',
             'transition-duration': 500
+          }
+        },
+        // COMPOUND NODE STYLE
+        {
+          selector: ':parent',
+          style: {
+             'background-opacity': 0.05,
+             'background-color': '#b45309', // Subtle Gold wash
+             'border-width': 2,
+             'border-style': 'dashed',
+             'border-color': '#b45309',
+             'border-opacity': 0.4,
+             'label': 'data(label)',
+             'font-family': 'Spectral, serif',
+             'font-weight': 'bold',
+             'text-valign': 'top',
+             'text-margin-y': -10,
+             'text-transform': 'uppercase',
+             'font-size': '20px',
+             'color': '#b45309',
+             'text-background-opacity': 0, // No BG for parent label
+             'shape': 'roundrectangle'
           }
         },
         {
           selector: 'edge',
           style: {
             'width': (ele: any) => {
-              const weight = ele.data('weight');
-              return weight ? Math.max(1, 1 + (weight * 50)) : 1.5;
+              const weight = ele.data('weight') || 0;
+              // Base 1.5, scale up to 5 based on weight
+              return Math.min(5, 1.5 + (weight * 50));
             },
             'line-color': (ele) => ele.data('sign') === 'negative' ? '#be123c' : '#355e3b', // Crimson (neg) vs OWP Green (pos)
             'target-arrow-color': (ele) => ele.data('sign') === 'negative' ? '#be123c' : '#355e3b',
@@ -126,8 +154,29 @@ export const GraphCanvas: React.FC = () => {
             'curve-style': 'bezier',
             'opacity': (ele: any) => {
                const weight = ele.data('weight') || 0;
-               return Math.min(1, 0.2 + (weight * 2));
-            }
+               return Math.min(1, 0.3 + (weight * 1.5));
+            },
+            // Edge Labels (Hidden by default, shown on hover/selection)
+            'text-rotation': 'autorotate',
+            'text-margin-y': -8,
+            'font-size': '9px',
+            'font-family': 'Inter, sans-serif',
+            'color': '#a1a1aa',
+            'text-background-color': '#09090b',
+            'text-background-opacity': 0.8,
+            'text-background-padding': '2px',
+            'text-background-shape': 'roundrectangle'
+          }
+        },
+        {
+          selector: 'edge:selected',
+          style: {
+             'label': 'data(label)',
+             'line-color': '#b45309',
+             'target-arrow-color': '#b45309',
+             'width': 3,
+             'opacity': 1,
+             'color': '#fff'
           }
         },
         {
@@ -140,15 +189,40 @@ export const GraphCanvas: React.FC = () => {
             'text-background-opacity': 1,
             'color': '#000'
           }
+        },
+        // Show labels on hover with increased width/opacity
+        {
+           selector: 'edge.hovered',
+           style: {
+              'label': 'data(label)',
+              'opacity': 1,
+              'color': '#fff',
+              'z-index': 999,
+              'width': (ele: any) => {
+                 const weight = ele.data('weight') || 0;
+                 // Base proportional width + highlight buffer
+                 return Math.min(7, 3.5 + (weight * 50)); 
+              },
+              'text-background-opacity': 1,
+              'text-background-color': '#0c0c0e',
+              'text-border-width': 1,
+              'text-border-color': '#355e3b',
+              'text-border-opacity': 0.4
+           }
         }
       ],
       wheelSensitivity: 0.2,
+      minZoom: 0.2,
+      maxZoom: 3,
     });
 
     const cy = cyRef.current;
 
     cy.on('tap', 'node', (evt) => {
       const node = evt.target;
+      // Prevent selection of Parent compound nodes
+      if (node.isParent()) return;
+
       const isMulti = evt.originalEvent.shiftKey || evt.originalEvent.ctrlKey;
       toggleNodeSelection(node.id(), isMulti);
       setContextMenu(null);
@@ -162,11 +236,49 @@ export const GraphCanvas: React.FC = () => {
     });
 
     cy.on('boxselect', 'node', (evt) => {
+      // Ignore compound parents in box select
+      if (evt.target.isParent()) return;
       toggleNodeSelection(evt.target.id(), true);
     });
+    
+    // Hover effects for edge labels
+    cy.on('mouseover', 'edge', (evt) => {
+       evt.target.addClass('hovered');
+    });
+    cy.on('mouseout', 'edge', (evt) => {
+       evt.target.removeClass('hovered');
+    });
+
+    // Node Tooltip Handlers
+    cy.on('mouseover', 'node', (evt) => {
+      const node = evt.target;
+      if (node.isParent()) return; // No tooltip for parent regions
+
+      if (containerRef.current) {
+        const { left, top } = containerRef.current.getBoundingClientRect();
+        // Use renderedBoundingBox for precise edge positioning relative to the visible node
+        const bb = node.renderedBoundingBox();
+        
+        setTooltip({
+          // Center of the bounding box width + left offset
+          x: left + bb.x1 + (bb.w / 2),
+          // Top of the bounding box + top offset
+          y: top + bb.y1,
+          data: node.data()
+        });
+      }
+    });
+
+    cy.on('mouseout', 'node', () => {
+      setTooltip(null);
+    });
+
+    // Hide tooltip on interactions
+    cy.on('zoom pan grab', () => setTooltip(null));
 
     // Context Menu Handler
     cy.on('cxttap', 'node', (evt) => {
+      if (evt.target.isParent()) return;
       evt.preventDefault();
       setContextMenu({
         x: evt.originalEvent.clientX,
@@ -183,63 +295,204 @@ export const GraphCanvas: React.FC = () => {
     };
   }, []);
 
-  // Sync Graph Data & Timeline Filtering
+  // Helper to get layout config
+  const getLayoutConfig = (layoutName: string) => {
+    switch (layoutName) {
+      case 'cola':
+        return {
+          name: 'cola',
+          animate: true,
+          refresh: 2,
+          maxSimulationTime: 6000,
+          ungrabifyWhileSimulating: false,
+          fit: true,
+          padding: 40,
+          randomize: true,
+          nodeSpacing: (node: any) => {
+            const pr = node.data('pagerank') || 0.01;
+            return (50 + (pr * 80)) * layoutParams.spacing; 
+          },
+          edgeLength: (edge: any) => {
+            const weight = edge.data('weight') || 0.2;
+            return Math.max(80, 350 - (weight * 270));
+          },
+          nodeDimensionsIncludeLabels: true,
+          gravity: layoutParams.gravity,
+          friction: layoutParams.friction,
+          initialEnergyOnIncremental: 0.5,
+        };
+      case 'cose':
+        return {
+          name: 'cose',
+          animate: true,
+          refresh: 20,
+          fit: true,
+          padding: 30,
+          randomize: false,
+          componentSpacing: 100,
+          nodeRepulsion: (node: any) => layoutParams.nodeRepulsion,
+          nodeOverlap: 10,
+          idealEdgeLength: (edge: any) => layoutParams.idealEdgeLength,
+          edgeElasticity: (edge: any) => 100,
+          nestingFactor: 5,
+          gravity: 80 * layoutParams.gravity,
+          numIter: 1000,
+          initialTemp: 200,
+          coolingFactor: 0.95,
+          minTemp: 1.0
+        };
+      case 'concentric':
+        return {
+          name: 'concentric',
+          fit: true,
+          padding: 30,
+          startAngle: 3 / 2 * Math.PI,
+          sweep: undefined,
+          clockwise: true,
+          equidistant: false,
+          minNodeSpacing: 10 * layoutParams.spacing,
+          boundingBox: undefined,
+          avoidOverlap: true,
+          nodeDimensionsIncludeLabels: false,
+          height: undefined,
+          width: undefined,
+          spacingFactor: undefined,
+          concentric: (node: any) => {
+            return node.data('pagerank') || 0;
+          },
+          levelWidth: (nodes: any) => {
+            return nodes.maxDegree() / 4;
+          },
+          animate: true,
+          animationDuration: 500,
+        };
+      case 'grid':
+        return {
+          name: 'grid',
+          fit: true,
+          padding: 30,
+          avoidOverlap: true,
+          animate: true,
+          animationDuration: 500,
+        };
+      case 'circle':
+        return {
+          name: 'circle',
+          fit: true,
+          padding: 30,
+          avoidOverlap: true,
+          animate: true,
+          animationDuration: 500,
+        };
+      default:
+        // Default to grid layout for structured archival view
+        return {
+          name: 'grid',
+          fit: true,
+          padding: 30,
+          avoidOverlap: true,
+          animate: true,
+          animationDuration: 500,
+        };
+    }
+  };
+
+  // Sync Graph Data & Layout
   useEffect(() => {
     if (!cyRef.current) return;
     const cy = cyRef.current;
 
     cy.batch(() => {
-      const newNodes = filteredGraph.nodes.map(n => ({
-        group: 'nodes',
-        data: n.data,
-        position: n.position
-      }));
+      // 1. Prepare Nodes
+      // If Region Grouping is ON, generate Parent Nodes
+      let parentNodes: any[] = [];
+      if (isGroupedByRegion) {
+        const regions = new Set<string>();
+        filteredGraph.nodes.forEach(n => {
+           if (n.data.region && n.data.region !== 'Unknown') {
+             regions.add(n.data.region);
+           }
+        });
+        
+        parentNodes = Array.from(regions).map(regionName => ({
+           group: 'nodes',
+           data: {
+             id: `region_${regionName.replace(/\s+/g, '_')}`,
+             label: regionName,
+             isParent: true // Flag to help styles
+           }
+        }));
+      }
+
+      // Map standard nodes, assigning 'parent' if applicable
+      const newNodes = filteredGraph.nodes.map(n => {
+        let parentId: string | undefined = undefined;
+        if (isGroupedByRegion && n.data.region && n.data.region !== 'Unknown') {
+            parentId = `region_${n.data.region.replace(/\s+/g, '_')}`;
+        }
+
+        return {
+          group: 'nodes',
+          data: { ...n.data, parent: parentId },
+          position: n.position || { x: 0, y: 0 } // Default position if missing
+        };
+      });
+
       const newEdges = filteredGraph.edges.map(e => ({
         group: 'edges',
         data: e.data
       }));
 
       cy.elements().remove();
-      cy.add([...newNodes, ...newEdges] as any);
+      // Add Parents first, then Children (though order often handled by CY)
+      cy.add([...parentNodes, ...newNodes, ...newEdges] as any);
       
+      // Smart Filtering & Visuals based on Timeline
       if (timelineYear !== null) {
         cy.nodes().forEach(node => {
+           if (node.isParent()) return; // Don't filter parent containers based on year directly
+
            const y = node.data('year');
            let isVisible = false;
+           // Nodes with no date are usually evergreen concepts, keep them visible but dim
            if (!y) {
-               isVisible = false; 
+               isVisible = true; 
+               node.style('opacity', 0.2); // Very dim for timeless concepts during playback
+               node.style('events', 'no'); // Non-interactive
            } else {
-               isVisible = (y >= timelineYear - 20 && y <= timelineYear + 20);
+               isVisible = y <= timelineYear;
+               
+               if (isVisible) {
+                   node.style('opacity', 1);
+                   node.style('events', 'yes');
+               } else {
+                   // Completely hide future nodes
+                   node.style('display', 'none'); 
+               }
            }
-           
-           node.style('opacity', isVisible ? 1 : 0.15);
-           node.connectedEdges().style('opacity', isVisible ? 1 : 0.05);
         });
+        
+        // Hide edges connected to hidden nodes
+        cy.edges().forEach(edge => {
+            if (edge.source().hidden() || edge.target().hidden()) {
+                edge.style('display', 'none');
+            } else {
+                edge.style('display', 'element');
+            }
+        });
+        
       } else {
         cy.elements().style('opacity', 1);
+        cy.elements().style('display', 'element');
+        cy.elements().style('events', 'yes');
       }
     });
 
-    cy.layout({
-      name: 'cola',
-      animate: true,
-      refresh: 2,
-      maxSimulationTime: 3000,
-      ungrabifyWhileSimulating: false,
-      fit: true,
-      padding: 30,
-      randomize: false,
-      nodeSpacing: (node: any) => {
-        const pr = node.data('pagerank') || 0.01;
-        return 40 + (pr * 100);
-      },
-      edgeLength: (edge: any) => 100,
-      nodeDimensionsIncludeLabels: true,
-      gravity: 0.5,
-      friction: 0.5,
-    } as any).run();
+    // Run Layout using the helper
+    const layoutConfig = getLayoutConfig(activeLayout);
+    cy.layout(layoutConfig as any).run();
 
-  }, [filteredGraph, timelineYear]);
+  }, [filteredGraph, timelineYear, activeLayout, isGroupedByRegion, layoutParams]);
 
   // Sync Selection
   useEffect(() => {
@@ -259,123 +512,177 @@ export const GraphCanvas: React.FC = () => {
     const cy = cyRef.current;
 
     cy.batch(() => {
+      // Pre-calc neighbors if deepening
+      let activeNeighbors = cy.collection();
+      if (deepeningNodeId) {
+         const target = cy.getElementById(deepeningNodeId);
+         if (target.length) {
+            activeNeighbors = target.neighborhood().nodes();
+         }
+      }
+
       cy.nodes().forEach(ele => {
+        if (ele.isParent()) return;
+
         const data = ele.data() as NodeData;
         
-        // Deepening Visual Effect (Active Research)
-        if (deepeningNodeId && data.id === deepeningNodeId) {
-            // Base style for deepening
-            ele.style('border-color', '#be123c'); // Crimson
-            ele.style('border-width', 8);
-            ele.style('border-style', 'double');
-            return;
-        }
-
-        let color = '#52525b'; // default zinc-600
+        // 1. Determine Base Color
+        let color = '#52525b'; 
         if (activeCommunityColoring) {
           const commId = data.louvainCommunity !== undefined ? data.louvainCommunity : data.community;
           if (commId !== undefined) {
              color = COMMUNITY_COLORS[commId % COMMUNITY_COLORS.length];
           }
         } else {
-          // Fallback to type colors if needed, but override with theme if possible
            color = COLORS[data.type] || color;
         }
         
-        ele.style('background-color', color);
-        
-        // Border Style based on Certainty Mode
-        if (!ele.selected()) {
-           // Default border is subtle goldish from main style, override here if needed
-           if (showCertainty) {
-             const cert = data.certainty;
-             if (cert === 'disputed') {
-                ele.style('border-style', 'dashed');
-                ele.style('border-color', '#be123c'); // Crimson for disputed
-             }
-             else if (cert === 'alleged') {
-                ele.style('border-style', 'dotted');
-             }
-             else {
-                ele.style('border-style', 'solid');
-             }
-           } else {
-             ele.style('border-style', 'solid');
-           }
+        // 2. Apply Deepening Context (or Reset)
+        if (deepeningNodeId) {
+            if (data.id === deepeningNodeId) {
+                // Target: Crimson, Highlighted
+                ele.style({
+                    'background-color': '#be123c',
+                    'border-color': '#be123c',
+                    'border-width': 8,
+                    'border-style': 'double',
+                    'opacity': 1,
+                    'z-index': 999
+                });
+            } else if (activeNeighbors.has(ele)) {
+                // Neighbor: Gold, Dashed
+                ele.style({
+                    'background-color': color,
+                    'border-color': '#b45309',
+                    'border-width': 4,
+                    'border-style': 'dashed',
+                    'opacity': 1,
+                    'z-index': 998
+                });
+            } else {
+                // Background: Dimmed
+                ele.style({
+                    'background-color': color,
+                    'opacity': 0.2,
+                    'border-width': 0,
+                    'z-index': 1
+                });
+            }
+        } else {
+            // Normal State
+            ele.style({
+                'background-color': color,
+                'opacity': 1,
+                'z-index': 10
+            });
+            
+            // Restore Stylesheet Defaults for borders if not selected
+            if (!ele.selected()) {
+                ele.removeStyle('border-color');
+                ele.removeStyle('border-width');
+                ele.removeStyle('border-style');
+                
+                // Re-apply certainty styles if needed
+                if (showCertainty) {
+                     const cert = data.certainty;
+                     if (cert === 'disputed') {
+                        ele.style('border-style', 'dashed');
+                        ele.style('border-color', '#be123c'); 
+                     } else if (cert === 'alleged') {
+                        ele.style('border-style', 'dotted');
+                     }
+                }
+            }
         }
       });
     });
 
   }, [filteredGraph, activeCommunityColoring, deepeningNodeId, showCertainty]);
 
-  // Animation Pulse Effect for Deepening Node
+  // Animation Pulse Effect
   useEffect(() => {
-    if (!deepeningNodeId || !cyRef.current) return;
-    const cy = cyRef.current;
-    const el = cy.$id(deepeningNodeId);
+    let interval: any;
     
-    // Simple pulsing effect using animation
-    const animate = () => {
-       if (el.removed() || !el.inside()) return; // check if element is valid
-       
-       el.animation({
-         style: { 'border-width': 12, 'border-opacity': 0.5 },
-         duration: 800
-       } as any).play().promise().then(() => {
-         el.animation({
-           style: { 'border-width': 4, 'border-opacity': 1 },
-           duration: 800
-         } as any).play().promise().then(() => {
-            // Check if still deepening same node
-            if (useStore.getState().deepeningNodeId === deepeningNodeId) {
-                animate();
-            }
-         });
-       });
-    };
-    
-    animate();
+    if (deepeningNodeId && cyRef.current) {
+        const cy = cyRef.current;
+        const target = cy.getElementById(deepeningNodeId);
+        const neighbors = target.neighborhood().nodes();
 
+        const pulse = () => {
+            // Pulse Target
+            target.animate({
+                 style: { 'border-width': 14, 'border-opacity': 0.4, 'background-opacity': 0.8 },
+                 duration: 800,
+                 easing: 'ease-out-sine'
+            }).animate({
+                 style: { 'border-width': 8, 'border-opacity': 1, 'background-opacity': 1 },
+                 duration: 800,
+                 easing: 'ease-in-sine'
+            });
+
+            // Pulse Neighbors (Subtle context breathing)
+            neighbors.animate({
+                 style: { 'border-width': 6, 'border-opacity': 0.5 },
+                 duration: 800,
+            }).animate({
+                 style: { 'border-width': 3, 'border-opacity': 1 },
+                 duration: 800,
+            });
+        };
+
+        pulse(); // Immediate start
+        interval = setInterval(pulse, 1600);
+    }
+    
     return () => {
-        el.stop(true);
+        if (interval) clearInterval(interval);
     };
   }, [deepeningNodeId]);
 
   return (
-    <div className="w-full h-full bg-[#09090b] relative overflow-hidden">
-      <div className="absolute top-4 left-4 z-10 pointer-events-none">
-        <div className="text-zinc-500 text-xs font-mono bg-black/50 p-1 rounded backdrop-blur-sm border border-[#b45309]/30">
-          <div>Nodes: {filteredGraph.nodes.length} | Edges: {filteredGraph.edges.length}</div>
-          <div>Balance: {((filteredGraph.meta?.globalBalance || 1) * 100).toFixed(1)}%</div>
-          <div>Modularity: {filteredGraph.meta?.modularity?.toFixed(3) || 'N/A'}</div>
-          <div className="text-[#b45309]">Coloring: {activeCommunityColoring ? 'Louvain Communities' : 'Entity Type'}</div>
-          {showCertainty && <div className="text-[#be123c] font-bold">Mode: Evidence Quality</div>}
-        </div>
-      </div>
+    <div className="w-full h-full relative bg-[#09090b]">
       <div ref={containerRef} className="w-full h-full" />
       
+      {/* Tooltip Overlay */}
+      {tooltip && (
+        <div 
+          className="fixed z-[100] pointer-events-none p-3 bg-zinc-900/90 border border-[#b45309]/50 rounded shadow-xl backdrop-blur-md max-w-xs animate-in fade-in zoom-in-95 duration-150"
+          style={{ 
+            left: tooltip.x, 
+            top: tooltip.y - 12, // Slight offset up from the node border
+            transform: 'translate(-50%, -100%)'
+          }}
+        >
+          <div className="flex items-center gap-2 mb-1">
+             <span className="font-spectral font-bold text-white text-lg leading-none">{tooltip.data.label}</span>
+             {tooltip.data.year && <span className="text-xs bg-[#b45309]/20 text-[#b45309] px-1 rounded font-mono">{tooltip.data.year}</span>}
+          </div>
+          <div className="w-full h-[1px] bg-[#b45309]/30 mb-2"></div>
+          <p className="text-xs text-zinc-300 font-serif italic line-clamp-3">{tooltip.data.description}</p>
+          <div className="mt-2 flex gap-2 text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
+             <span>PR: {(tooltip.data.pagerank || 0).toFixed(2)}</span>
+             <span>Region: {tooltip.data.region || 'Unknown'}</span>
+          </div>
+        </div>
+      )}
+
       {/* Context Menu */}
       {contextMenu && (
         <div 
-          className="fixed z-50 bg-[#0c0c0e] border border-[#b45309]/30 rounded-sm shadow-xl py-1 min-w-[160px] animate-in fade-in zoom-in-95 duration-100"
-          style={{ top: contextMenu.y, left: contextMenu.x }}
+          className="fixed z-50 bg-zinc-900 border border-zinc-700 shadow-xl rounded py-1 min-w-[160px] animate-in fade-in zoom-in-95 duration-100"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
         >
-          <div className="px-3 py-2 border-b border-[#b45309]/10 mb-1">
-             <span className="text-xs font-bold text-[#b45309] block uppercase font-spectral">
-               {graph.nodes.find(n => n.data.id === contextMenu.nodeId)?.data.label}
-             </span>
-          </div>
           <button 
             onClick={() => handleDeepenContext(contextMenu.nodeId)}
-            className="w-full text-left px-3 py-2 text-sm text-[#be123c] hover:bg-[#be123c]/10 transition-colors flex items-center gap-2 font-serif italic"
+            className="w-full px-4 py-2 text-left text-sm text-white hover:bg-[#355e3b] hover:text-white flex items-center gap-2 transition-colors"
           >
-            <BookOpenCheck size={14} /> Deepen Research
+            <BookOpenCheck size={14} /> Research Deeply
           </button>
           <button 
             onClick={() => setContextMenu(null)}
-            className="w-full text-left px-3 py-2 text-sm text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-800 hover:text-white flex items-center gap-2 transition-colors"
           >
-            <X size={14} /> Cancel
+            <X size={14} /> Close Menu
           </button>
         </div>
       )}

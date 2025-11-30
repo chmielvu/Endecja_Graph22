@@ -1,6 +1,7 @@
 
+
 import { create } from 'zustand';
-import { AppState, KnowledgeGraph, NodeData, ChatMessage, Toast, RegionalAnalysisResult, DuplicateCandidate, GraphPatch, ResearchTask, GraphNode, GraphEdge } from './types';
+import { AppState, KnowledgeGraph, NodeData, ChatMessage, Toast, RegionalAnalysisResult, DuplicateCandidate, GraphPatch, ResearchTask, GraphNode, GraphEdge, LayoutParams } from './types';
 import { INITIAL_GRAPH } from './constants';
 import { enrichGraphWithMetrics, calculateRegionalMetrics } from './services/graphService';
 import { storage } from './services/storage';
@@ -30,8 +31,18 @@ interface Store extends AppState {
   // Analysis & View
   setFilterYear: (year: number | null) => void;
   toggleSidebar: () => void;
+  
+  // Right Sidebar & Timeline Controls
+  isRightSidebarOpen: boolean;
+  toggleRightSidebar: () => void;
+  isPlaying: boolean;
+  setIsPlaying: (playing: boolean) => void;
+
   setCommunityColoring: (active: boolean) => void;
   setCertaintyMode: (active: boolean) => void;
+  setGroupedByRegion: (active: boolean) => void; // NEW
+  setLayout: (layout: string) => void;
+  setLayoutParams: (params: Partial<LayoutParams>) => void;
   runRegionalAnalysis: () => void;
   setShowStatsPanel: (show: boolean) => void;
   setSemanticSearchOpen: (open: boolean) => void;
@@ -68,9 +79,25 @@ export const useStore = create<Store>((set, get) => ({
   metricsCalculated: false,
   activeCommunityColoring: true,
   showCertainty: false,
+  isGroupedByRegion: false, // Default off
+  activeLayout: 'grid', // Updated default to grid
+  layoutParams: { 
+    gravity: 0.25, 
+    friction: 0.6, 
+    spacing: 1.0,
+    nodeRepulsion: 450000,
+    idealEdgeLength: 100
+  },
   minDegreeFilter: 0,
+  
+  // Sidebar States
   isSidebarOpen: true,
+  isRightSidebarOpen: true,
+  
+  // Timeline State
   timelineYear: null,
+  isPlaying: false,
+
   regionalAnalysis: null,
   showStatsPanel: false,
   isSemanticSearchOpen: false,
@@ -397,11 +424,17 @@ export const useStore = create<Store>((set, get) => ({
   removeToast: (id) => set(state => ({ toasts: state.toasts.filter(t => t.id !== id) })),
   
   toggleSidebar: () => set(state => ({ isSidebarOpen: !state.isSidebarOpen })),
+  toggleRightSidebar: () => set(state => ({ isRightSidebarOpen: !state.isRightSidebarOpen })),
+  
   setThinking: (val) => set({ isThinking: val }),
   addMessage: (msg) => set(state => ({ messages: [...state.messages, msg] })),
   setCommunityColoring: (val) => set({ activeCommunityColoring: val }),
   setCertaintyMode: (val) => set({ showCertainty: val }),
+  setGroupedByRegion: (val) => set({ isGroupedByRegion: val }),
+  setLayout: (layout) => set({ activeLayout: layout }),
+  setLayoutParams: (params) => set(state => ({ layoutParams: { ...state.layoutParams, ...params } })),
   setFilterYear: (y) => set({ timelineYear: y }),
+  setIsPlaying: (playing) => set({ isPlaying: playing }),
   setShowStatsPanel: (show) => set({ showStatsPanel: show }),
   setSemanticSearchOpen: (open) => set({ isSemanticSearchOpen: open }),
   setPendingPatch: (patch) => set({ pendingPatch: patch }),

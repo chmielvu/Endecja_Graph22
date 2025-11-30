@@ -1,4 +1,5 @@
 
+
 export type NodeType = 'person' | 'organization' | 'event' | 'concept' | 'publication' | 'Person' | 'Organization' | 'Event' | 'Concept' | 'Publication';
 
 export interface NodeData {
@@ -10,6 +11,7 @@ export interface NodeData {
   dates?: string;
   importance?: number;
   region?: string; // 'Warszawa', 'Wielkopolska', 'Galicja', 'Emigracja'
+  parent?: string; // For Compound Nodes (Cytoscape)
   
   // Metrics
   degreeCentrality?: number;
@@ -110,6 +112,14 @@ export interface ResearchTask {
   reasoning?: string;
 }
 
+export interface LayoutParams {
+  gravity: number;
+  friction: number;
+  spacing: number;
+  nodeRepulsion: number; // For Cose
+  idealEdgeLength: number; // For Cose
+}
+
 export interface AppState {
   // Graph State
   graph: KnowledgeGraph;
@@ -121,6 +131,9 @@ export interface AppState {
   metricsCalculated: boolean;
   activeCommunityColoring: boolean;
   showCertainty: boolean; // Toggle for Evidence Quality Mode
+  isGroupedByRegion: boolean; // Toggle for Compound Nodes
+  activeLayout: string; // 'cola', 'cose', 'concentric', 'grid', 'circle'
+  layoutParams: LayoutParams;
   minDegreeFilter: number;
   regionalAnalysis: RegionalAnalysisResult | null;
   

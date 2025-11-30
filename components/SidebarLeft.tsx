@@ -1,6 +1,7 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useStore } from '../store';
-import { Play, Search, Scissors, X, GitMerge, Map, Activity, Edit2, Trash2, BrainCircuit, Undo2, Redo2, FileJson, BookOpenCheck, ShieldAlert, PanelLeftClose } from 'lucide-react';
+import { Play, Search, Scissors, X, GitMerge, Map, Activity, Edit2, Trash2, BrainCircuit, Undo2, Redo2, FileJson, BookOpenCheck, ShieldAlert, PanelLeftClose, LayoutGrid, Group } from 'lucide-react';
 import { generateGraphExpansion, generateNodeDeepening } from '../services/geminiService';
 import { detectDuplicatesSemantic, detectDuplicates } from '../services/graphService';
 import { DuplicateCandidate } from '../types';
@@ -16,6 +17,12 @@ export const SidebarLeft: React.FC = () => {
     setCommunityColoring, 
     showCertainty,
     setCertaintyMode,
+    isGroupedByRegion,
+    setGroupedByRegion,
+    activeLayout,
+    setLayout,
+    layoutParams,
+    setLayoutParams,
     setThinking,
     mergeNodes,
     addToast,
@@ -335,6 +342,107 @@ export const SidebarLeft: React.FC = () => {
                 >
                   <div className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-all duration-300 shadow-md ${showCertainty ? 'left-5' : 'left-1'}`}></div>
                 </button>
+              </div>
+
+               <div className="flex items-center justify-between px-3 py-2.5 bg-[#09090b] border border-[#355e3b]/20 rounded-sm hover:border-[#355e3b]/40 transition-colors">
+                <span className="text-sm text-zinc-300 flex items-center gap-2"><Group size={14} className={isGroupedByRegion ? "text-[#b45309]" : "text-zinc-600"}/> Group By Region</span>
+                <button 
+                  onClick={() => setGroupedByRegion(!isGroupedByRegion)} 
+                  className={`w-9 h-5 rounded-full relative transition-colors duration-300 ${isGroupedByRegion ? 'bg-[#b45309]' : 'bg-zinc-800'}`}
+                >
+                  <div className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-all duration-300 shadow-md ${isGroupedByRegion ? 'left-5' : 'left-1'}`}></div>
+                </button>
+              </div>
+
+              {/* Layout Engine Selector */}
+               <div className="px-3 py-2.5 bg-[#09090b] border border-[#355e3b]/20 rounded-sm hover:border-[#355e3b]/40 transition-colors">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-zinc-300 flex items-center gap-2"><LayoutGrid size={14} className="text-zinc-500"/> Layout Engine</span>
+                  <select 
+                    value={activeLayout}
+                    onChange={(e) => setLayout(e.target.value)}
+                    className="bg-zinc-900 text-xs text-white border border-zinc-700 rounded px-2 py-1 outline-none focus:border-[#b45309] w-28"
+                  >
+                     <option value="cola">Cola (Physics)</option>
+                     <option value="cose">Cose (Spring)</option>
+                     <option value="concentric">Concentric</option>
+                     <option value="grid">Grid</option>
+                     <option value="circle">Circle</option>
+                  </select>
+                </div>
+                
+                {/* Parameter Controls for Physics Layouts */}
+                {(activeLayout === 'cola' || activeLayout === 'cose' || activeLayout === 'concentric') && (
+                  <div className="mt-3 space-y-3 pt-3 border-t border-zinc-800 animate-in slide-in-from-top-2">
+                     
+                     {(activeLayout === 'cola' || activeLayout === 'cose') && (
+                        <div className="space-y-1">
+                           <div className="flex justify-between text-[10px] text-zinc-500 uppercase tracking-wider">
+                              <span>Gravity</span> <span className="text-[#355e3b]">{layoutParams.gravity.toFixed(2)}</span>
+                           </div>
+                           <input 
+                              type="range" min="0.05" max="1" step="0.05" 
+                              value={layoutParams.gravity} 
+                              onChange={(e) => setLayoutParams({ gravity: parseFloat(e.target.value) })}
+                              className="w-full h-1 bg-zinc-800 rounded appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#b45309] [&::-webkit-slider-thumb]:cursor-pointer"
+                           />
+                        </div>
+                     )}
+                     
+                     {activeLayout === 'cola' && (
+                       <div className="space-y-1">
+                         <div className="flex justify-between text-[10px] text-zinc-500 uppercase tracking-wider">
+                            <span>Friction</span> <span className="text-[#355e3b]">{layoutParams.friction.toFixed(2)}</span>
+                         </div>
+                         <input 
+                           type="range" min="0.1" max="0.9" step="0.1" 
+                           value={layoutParams.friction} 
+                           onChange={(e) => setLayoutParams({ friction: parseFloat(e.target.value) })}
+                           className="w-full h-1 bg-zinc-800 rounded appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#b45309] [&::-webkit-slider-thumb]:cursor-pointer"
+                         />
+                       </div>
+                     )}
+
+                     {activeLayout === 'cose' && (
+                       <>
+                         <div className="space-y-1">
+                           <div className="flex justify-between text-[10px] text-zinc-500 uppercase tracking-wider">
+                              <span>Repulsion</span> <span className="text-[#355e3b]">{layoutParams.nodeRepulsion.toLocaleString()}</span>
+                           </div>
+                           <input 
+                             type="range" min="100000" max="1000000" step="10000" 
+                             value={layoutParams.nodeRepulsion} 
+                             onChange={(e) => setLayoutParams({ nodeRepulsion: parseFloat(e.target.value) })}
+                             className="w-full h-1 bg-zinc-800 rounded appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#b45309] [&::-webkit-slider-thumb]:cursor-pointer"
+                           />
+                         </div>
+                         <div className="space-y-1">
+                           <div className="flex justify-between text-[10px] text-zinc-500 uppercase tracking-wider">
+                              <span>Edge Length</span> <span className="text-[#355e3b]">{layoutParams.idealEdgeLength}</span>
+                           </div>
+                           <input 
+                             type="range" min="20" max="300" step="10" 
+                             value={layoutParams.idealEdgeLength} 
+                             onChange={(e) => setLayoutParams({ idealEdgeLength: parseFloat(e.target.value) })}
+                             className="w-full h-1 bg-zinc-800 rounded appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#b45309] [&::-webkit-slider-thumb]:cursor-pointer"
+                           />
+                         </div>
+                       </>
+                     )}
+
+                     <div className="space-y-1">
+                       <div className="flex justify-between text-[10px] text-zinc-500 uppercase tracking-wider">
+                          <span>Node Spacing</span> <span className="text-[#355e3b]">{layoutParams.spacing.toFixed(1)}x</span>
+                       </div>
+                       <input 
+                         type="range" min="0.5" max="3" step="0.1" 
+                         value={layoutParams.spacing} 
+                         onChange={(e) => setLayoutParams({ spacing: parseFloat(e.target.value) })}
+                         className="w-full h-1 bg-zinc-800 rounded appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#b45309] [&::-webkit-slider-thumb]:cursor-pointer"
+                       />
+                     </div>
+                  </div>
+                )}
               </div>
             </div>
 
