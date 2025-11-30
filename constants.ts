@@ -4,6 +4,7 @@ import { KnowledgeGraph, GraphNode, GraphEdge } from './types';
 export const THEME = {
   colors: {
     background: '#09090b',
+    surface: '#0c0c0e',
     zinc900: '#18181b',
     owpGreen: '#355e3b',
     archivalGold: '#b45309',

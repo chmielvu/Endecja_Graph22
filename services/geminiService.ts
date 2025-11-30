@@ -101,12 +101,12 @@ export async function generateGraphExpansion(
 export async function generateNodeDeepening(
   node: NodeData,
   currentGraph: KnowledgeGraph
-): Promise<{ updatedProperties: Partial<NodeData>, newEdges: any[], thoughtProcess: string }> {
+): Promise<{ updatedProperties: Partial<NodeData>, newEdges: any[], thoughtSignature: string }> {
   const ai = getAiClient();
-  // Provide context of potentially related nodes to allow linking
+  
   const context = currentGraph.nodes
     .map(n => `${n.data.id} (${n.data.label})`)
-    .slice(0, 500) // Moderate limit for deepening context
+    .slice(0, 500)
     .join(', ');
 
   const prompt = `
@@ -119,13 +119,13 @@ export async function generateNodeDeepening(
     ${context}
 
     ZADANIE:
-    1. Przeprowadź kwerendę w swojej pamięci i dokumentach (wiedza historyczna).
-    2. Uzupełnij braki: daty (YYYY-YYYY), konkretny region, precyzyjny opis roli w ruchu narodowym.
-    3. Zidentyfikuj 1-2 KLUCZOWE relacje, których brakuje (np. z kim współpracował, kogo zwalczał), preferując istniejące węzły z kontekstu.
+    1. Przeprowadź kwerendę w swojej pamięci (System 2 Thinking).
+    2. Wygeneruj "Thought Signature" - skrót myślowy, który posłuży do weryfikacji spójności w kolejnych krokach.
+    3. Uzupełnij braki i relacje.
 
     Zwróć JSON:
     {
-      "thoughtProcess": "Krótki komentarz w stylu Dmowskiego (np. 'Sprawdziłem zapiski ze zjazdu...').",
+      "thoughtSignature": "Hash myślowy: [Krótka synteza logiczna, dlaczego dodano te konkretne relacje, np. 'W oparciu o Pakt Lanckoroński...']",
       "updatedProperties": { 
          "dates": "...", 
          "description": "...", 
@@ -143,7 +143,7 @@ export async function generateNodeDeepening(
       model: 'gemini-3-pro-preview',
       contents: prompt,
       config: {
-        thinkingConfig: { thinkingBudget: 4096 },
+        thinkingConfig: { thinkingBudget: 4096 }, // High thinking budget for historical accuracy
         tools: [{ googleSearch: {} }],
       }
     });

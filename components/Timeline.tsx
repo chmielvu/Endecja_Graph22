@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { Play, Pause, Rewind } from 'lucide-react';
@@ -50,15 +49,15 @@ export const Timeline: React.FC = () => {
   };
 
   return (
-    <div className="h-16 bg-[#0c0c0e] border-t border-[#b45309]/20 flex items-center px-4 gap-4 shrink-0 relative z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.5)]">
+    <div className="h-16 bg-surface border-t border-archival-gold/20 flex items-center px-4 gap-4 shrink-0 relative z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.5)]">
       
       {/* Controls */}
       <div className="flex items-center gap-2">
          <button 
            onClick={handlePlayToggle}
            className={`p-2 rounded-full border transition-all ${isPlaying 
-             ? 'bg-[#be123c]/10 text-[#be123c] border-[#be123c]/50 animate-pulse' 
-             : 'bg-[#355e3b]/10 text-[#355e3b] border-[#355e3b]/50 hover:bg-[#355e3b] hover:text-white'}`}
+             ? 'bg-crimson/10 text-crimson border-crimson/50 animate-pulse' 
+             : 'bg-owp-green/10 text-owp-green border-owp-green/50 hover:bg-owp-green hover:text-white'}`}
            title={isPlaying ? "Pause History" : "Play History"}
          >
            {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
@@ -66,7 +65,7 @@ export const Timeline: React.FC = () => {
          
          <button 
            onClick={resetTimeline}
-           className={`text-xs font-mono px-3 py-1.5 rounded-sm transition-colors whitespace-nowrap border flex items-center gap-2 ${timelineYear === null ? 'bg-[#b45309] text-white border-[#b45309]' : 'bg-transparent text-zinc-500 border-zinc-700 hover:border-zinc-500'}`}
+           className={`text-xs font-mono px-3 py-1.5 rounded-sm transition-colors whitespace-nowrap border flex items-center gap-2 ${timelineYear === null ? 'bg-archival-gold text-white border-archival-gold' : 'bg-transparent text-zinc-500 border-zinc-700 hover:border-zinc-500'}`}
          >
            <Rewind size={12} /> ALL TIME
          </button>
@@ -89,7 +88,7 @@ export const Timeline: React.FC = () => {
                opacity: timelineYear ? 1 : 0
              }}
            >
-              <span className="text-[#b45309] font-bold text-lg font-spectral bg-[#0c0c0e] px-2 border border-[#b45309]/30 rounded">
+              <span className="text-archival-gold font-bold text-lg font-spectral bg-surface px-2 border border-archival-gold/30 rounded">
                 {timelineYear}
               </span>
            </div>
@@ -103,7 +102,7 @@ export const Timeline: React.FC = () => {
           
           {/* Progress Bar */}
           <div 
-            className="absolute h-1 bg-[#b45309] rounded-l-lg transition-all duration-100"
+            className="absolute h-1 bg-archival-gold rounded-l-lg transition-all duration-100"
             style={{ width: timelineYear ? `${((timelineYear - MIN_YEAR) / (MAX_YEAR - MIN_YEAR)) * 100}%` : '100%' }}
           ></div>
 
@@ -120,7 +119,7 @@ export const Timeline: React.FC = () => {
             className="w-full h-4 bg-transparent appearance-none cursor-pointer z-10 
               [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
               [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white 
-              [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#b45309] 
+              [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-archival-gold 
               [&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(180,83,9,0.5)]
               hover:[&::-webkit-slider-thumb]:scale-110 transition-all"
           />

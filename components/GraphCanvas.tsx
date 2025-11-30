@@ -59,14 +59,19 @@ export const GraphCanvas: React.FC = () => {
     try {
       const result = await generateNodeDeepening(node, graph);
       
+      // THOUGHT SIGNATURE HANDLER
+      // We inject the signature into the reasoning field to persist the agent's context
       setPendingPatch({
         type: 'deepening',
-        reasoning: result.thoughtProcess,
+        reasoning: result.thoughtSignature, // Mapped from thoughtSignature
         nodes: [{ id: node.id, ...result.updatedProperties }], 
         edges: result.newEdges
       });
       
-      updateResearchTask(taskId, { status: 'complete', reasoning: result.thoughtProcess });
+      updateResearchTask(taskId, { 
+          status: 'complete', 
+          reasoning: result.thoughtSignature 
+      });
       
     } catch (e) {
       addToast({ title: 'Błąd Archiwum', description: 'Nie udało się pogłębić wiedzy o węźle.', type: 'error' });
@@ -512,7 +517,8 @@ export const GraphCanvas: React.FC = () => {
 
     cy.batch(() => {
       // Pre-calc neighbors if deepening
-      let activeNeighbors = cy.collection();
+      // Explicitly cast to any to resolve NodeCollection vs CollectionReturnValue mismatch in some TS environments
+      let activeNeighbors = cy.collection() as any; 
       if (deepeningNodeId) {
          const target = cy.getElementById(deepeningNodeId);
          if (target.length) {
@@ -604,8 +610,9 @@ export const GraphCanvas: React.FC = () => {
     
     if (deepeningNodeId && cyRef.current) {
         const cy = cyRef.current;
-        const target = cy.getElementById(deepeningNodeId);
-        const neighbors = target.neighborhood().nodes();
+        // Cast to any to handle Cytoscape collection type mismatches safely in TS
+        const target = cy.getElementById(deepeningNodeId) as any;
+        const neighbors = target.neighborhood().nodes() as any;
 
         const pulse = () => {
             // Pulse Target
@@ -639,13 +646,13 @@ export const GraphCanvas: React.FC = () => {
   }, [deepeningNodeId]);
 
   return (
-    <div className="w-full h-full relative bg-[#09090b]">
+    <div className="w-full h-full relative bg-zinc-950">
       <div ref={containerRef} className="w-full h-full" />
       
       {/* Tooltip Overlay */}
       {tooltip && (
         <div 
-          className="fixed z-[100] pointer-events-none p-3 bg-zinc-900/90 border border-[#b45309]/50 rounded shadow-xl backdrop-blur-md max-w-xs animate-in fade-in zoom-in-95 duration-150"
+          className="fixed z-[100] pointer-events-none p-3 bg-zinc-900/90 border border-archival-gold/50 rounded shadow-xl backdrop-blur-md max-w-xs animate-in fade-in zoom-in-95 duration-150"
           style={{ 
             left: tooltip.x, 
             top: tooltip.y - 12, // Slight offset up from the node border
@@ -654,9 +661,9 @@ export const GraphCanvas: React.FC = () => {
         >
           <div className="flex items-center gap-2 mb-1">
              <span className="font-spectral font-bold text-white text-lg leading-none">{tooltip.data.label}</span>
-             {tooltip.data.year && <span className="text-xs bg-[#b45309]/20 text-[#b45309] px-1 rounded font-mono">{tooltip.data.year}</span>}
+             {tooltip.data.year && <span className="text-xs bg-archival-gold/20 text-archival-gold px-1 rounded font-mono">{tooltip.data.year}</span>}
           </div>
-          <div className="w-full h-[1px] bg-[#b45309]/30 mb-2"></div>
+          <div className="w-full h-[1px] bg-archival-gold/30 mb-2"></div>
           <p className="text-xs text-zinc-300 font-serif italic line-clamp-3">{tooltip.data.description}</p>
           <div className="mt-2 flex gap-2 text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
              <span>PR: {(tooltip.data.pagerank || 0).toFixed(2)}</span>

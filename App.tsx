@@ -24,7 +24,7 @@ function App() {
       {!isSidebarOpen && (
         <button 
           onClick={toggleSidebar}
-          className="absolute top-4 left-4 z-50 p-2 bg-[#0c0c0e] border border-owp-green/50 text-owp-green rounded shadow-lg hover:bg-owp-green hover:text-white transition-all duration-300"
+          className="absolute top-4 left-4 z-50 p-2 bg-surface border border-owp-green/50 text-owp-green rounded shadow-lg hover:bg-owp-green hover:text-white transition-all duration-300"
           title="Open Sidebar"
         >
           <PanelLeftOpen size={20} />
@@ -35,7 +35,7 @@ function App() {
       {!isRightSidebarOpen && (
         <button 
           onClick={toggleRightSidebar}
-          className="absolute top-4 right-4 z-50 p-2 bg-[#0c0c0e] border border-archival-gold/50 text-archival-gold rounded shadow-lg hover:bg-archival-gold hover:text-white transition-all duration-300"
+          className="absolute top-4 right-4 z-50 p-2 bg-surface border border-archival-gold/50 text-archival-gold rounded shadow-lg hover:bg-archival-gold hover:text-white transition-all duration-300"
           title="Open Dmowski Chat"
         >
           <PanelRightOpen size={20} />

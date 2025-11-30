@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { chatWithAgent } from '../services/geminiService';
@@ -47,16 +46,16 @@ export const SidebarRight: React.FC = () => {
 
   return (
     <div 
-      className={`bg-[#0c0c0e] border-l border-[#b45309]/20 flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out relative shadow-2xl z-20 ${isRightSidebarOpen ? 'w-[420px]' : 'w-0'}`}
+      className={`bg-surface border-l border-archival-gold/20 flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out relative shadow-2xl z-20 ${isRightSidebarOpen ? 'w-[420px]' : 'w-0'}`}
     >
       <div className="w-[420px] h-full flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-[#b45309]/20 flex justify-between items-center bg-[#0c0c0e] shrink-0">
+        <div className="p-4 border-b border-archival-gold/20 flex justify-between items-center bg-surface shrink-0">
           <h2 className="text-lg font-bold text-[#e4e4e7] flex items-center gap-2 font-spectral">
-            <MessageSquare size={18} className="text-[#b45309]" /> Roman Dmowski (1925)
+            <MessageSquare size={18} className="text-archival-gold" /> Roman Dmowski (1925)
           </h2>
           <div className="flex items-center gap-2">
-             <span className="text-[10px] bg-[#355e3b]/10 text-[#355e3b] border border-[#355e3b]/30 px-2 py-0.5 rounded font-mono">PERSONA ACTIVE</span>
+             <span className="text-[10px] bg-owp-green/10 text-owp-green border border-owp-green/30 px-2 py-0.5 rounded font-mono">PERSONA ACTIVE</span>
              <button onClick={toggleRightSidebar} className="text-zinc-500 hover:text-white transition-colors ml-2"><PanelRightClose size={18}/></button>
           </div>
         </div>
@@ -67,10 +66,10 @@ export const SidebarRight: React.FC = () => {
           ))}
           {isThinking && (
             <div className="flex gap-2 items-start animate-pulse opacity-70">
-              <div className="w-8 h-8 rounded-full bg-[#b45309]/20 flex items-center justify-center border border-[#b45309]/30">
-                 <Cpu size={14} className="text-[#b45309]" />
+              <div className="w-8 h-8 rounded-full bg-archival-gold/20 flex items-center justify-center border border-archival-gold/30">
+                 <Cpu size={14} className="text-archival-gold" />
               </div>
-              <div className="bg-[#18181b] rounded-lg p-3 text-xs text-zinc-400 font-serif italic border border-zinc-800">
+              <div className="bg-zinc-900 rounded-lg p-3 text-xs text-zinc-400 font-serif italic border border-zinc-800">
                 Dmowski analizuje sytuację geopolityczną...
               </div>
             </div>
@@ -78,7 +77,7 @@ export const SidebarRight: React.FC = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="p-4 border-t border-[#b45309]/20 bg-[#0c0c0e] shrink-0">
+        <div className="p-4 border-t border-archival-gold/20 bg-surface shrink-0">
           <div className="flex gap-2">
             <input
               type="text"
@@ -86,12 +85,12 @@ export const SidebarRight: React.FC = () => {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               placeholder="Zadaj pytanie Panu Romanowi..."
-              className="flex-1 bg-[#09090b] border border-zinc-800 rounded-sm px-3 py-2 text-sm text-white focus:outline-none focus:border-[#b45309] font-serif placeholder:font-sans placeholder:text-zinc-600"
+              className="flex-1 bg-zinc-950 border border-zinc-800 rounded-sm px-3 py-2 text-sm text-white focus:outline-none focus:border-archival-gold font-serif placeholder:font-sans placeholder:text-zinc-600"
             />
             <button 
               onClick={handleSend}
               disabled={isThinking}
-              className="bg-[#355e3b] hover:bg-[#2f5335] text-white p-2 rounded-sm disabled:opacity-50 border border-[#355e3b]"
+              className="bg-owp-green hover:bg-[#2f5335] text-white p-2 rounded-sm disabled:opacity-50 border border-owp-green"
             >
               <Send size={16} />
             </button>
@@ -108,27 +107,27 @@ const ChatMessageItem: React.FC<{ msg: any }> = ({ msg }) => {
 
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-      <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center border ${isUser ? 'bg-[#355e3b]/20 border-[#355e3b]/50' : 'bg-[#b45309]/10 border-[#b45309]/30'}`}>
-        {isUser ? <span className="text-xs text-[#355e3b] font-bold">Ty</span> : <span className="font-serif font-bold text-xs text-[#b45309]">RD</span>}
+      <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center border ${isUser ? 'bg-owp-green/20 border-owp-green/50' : 'bg-archival-gold/10 border-archival-gold/30'}`}>
+        {isUser ? <span className="text-xs text-owp-green font-bold">Ty</span> : <span className="font-serif font-bold text-xs text-archival-gold">RD</span>}
       </div>
       
       <div className={`max-w-[85%] space-y-2`}>
-        <div className={`p-3 rounded-sm text-sm break-words whitespace-pre-wrap ${isUser ? 'bg-[#355e3b]/10 text-zinc-200 border border-[#355e3b]/30' : 'bg-[#18181b] text-[#e4e4e7] border border-zinc-800 font-serif'}`}>
+        <div className={`p-3 rounded-sm text-sm break-words whitespace-pre-wrap ${isUser ? 'bg-owp-green/10 text-zinc-200 border border-owp-green/30' : 'bg-zinc-900 text-[#e4e4e7] border border-zinc-800 font-serif'}`}>
           {msg.content}
         </div>
 
         {/* ReAct Reasoning Dropdown */}
         {!isUser && msg.reasoning && (
-           <div className="border border-[#b45309]/20 rounded-sm bg-[#0c0c0e] overflow-hidden">
+           <div className="border border-archival-gold/20 rounded-sm bg-surface overflow-hidden">
              <button 
                onClick={() => setShowReasoning(!showReasoning)}
-               className="w-full flex items-center gap-2 px-3 py-1.5 bg-[#0c0c0e] hover:bg-[#18181b] transition-colors text-xs text-[#b45309]"
+               className="w-full flex items-center gap-2 px-3 py-1.5 bg-surface hover:bg-zinc-900 transition-colors text-xs text-archival-gold"
              >
                {showReasoning ? <ChevronDown size={12}/> : <ChevronRight size={12}/>}
                <Scroll size={10} /> Przemyślenia (Chain-of-Thought)
              </button>
              {showReasoning && (
-               <div className="p-3 text-xs text-zinc-500 font-mono bg-black/20 whitespace-pre-wrap border-t border-[#b45309]/10 break-words">
+               <div className="p-3 text-xs text-zinc-500 font-mono bg-black/20 whitespace-pre-wrap border-t border-archival-gold/10 break-words">
                  {msg.reasoning}
                </div>
              )}

@@ -142,13 +142,14 @@ export const SidebarLeft: React.FC = () => {
     try {
       const result = await generateNodeDeepening(selectedNode, graph);
       
+      // Mapped thoughtSignature to reasoning
       setPendingPatch({
         type: 'deepening',
-        reasoning: result.thoughtProcess,
+        reasoning: result.thoughtSignature,
         nodes: [{ id: selectedNode.id, ...result.updatedProperties }], 
         edges: result.newEdges
       });
-      updateResearchTask(taskId, { status: 'complete', reasoning: result.thoughtProcess });
+      updateResearchTask(taskId, { status: 'complete', reasoning: result.thoughtSignature });
 
     } catch (e) {
       addToast({ title: 'Błąd Archiwum', description: 'Nie udało się pogłębić wiedzy o węźle.', type: 'error' });
@@ -228,7 +229,7 @@ export const SidebarLeft: React.FC = () => {
     <>
       <div 
         ref={sidebarRef}
-        className={`${isSidebarOpen ? 'border-r' : 'border-r-0'} bg-[#0c0c0e] border-[#355e3b]/30 overflow-hidden flex-shrink-0 relative shadow-2xl shadow-black z-20`}
+        className={`${isSidebarOpen ? 'border-r' : 'border-r-0'} bg-surface border-owp-green/30 overflow-hidden flex-shrink-0 relative shadow-2xl shadow-black z-20`}
         style={{ 
           width: isSidebarOpen ? sidebarWidth : 0, 
           transition: isResizing ? 'none' : 'width 0.3s cubic-bezier(0.16, 1, 0.3, 1)' 
@@ -239,15 +240,15 @@ export const SidebarLeft: React.FC = () => {
           {/* Header Section with Icon and Title */}
           <div className="flex items-start justify-between mb-8">
             <div className="flex items-center gap-3 group">
-                <div className="text-[#355e3b] group-hover:text-[#b45309] transition-colors duration-500 drop-shadow-[0_0_10px_rgba(53,94,59,0.5)]">
+                <div className="text-owp-green group-hover:text-archival-gold transition-colors duration-500 drop-shadow-[0_0_10px_rgba(53,94,59,0.5)]">
                     <MieczykIcon size={36} />
                 </div>
                 <div>
                     <h1 className="font-spectral font-bold text-2xl text-zinc-100 tracking-wide leading-none">
-                      ENDECJA<span className="text-[#355e3b]">KG</span>
+                      ENDECJA<span className="text-owp-green">KG</span>
                     </h1>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] text-[#355e3b] font-mono tracking-widest border border-[#355e3b]/30 px-1 rounded bg-[#355e3b]/5">
+                      <span className="text-[10px] text-owp-green font-mono tracking-widest border border-owp-green/30 px-1 rounded bg-owp-green/5">
                         TIER-4
                       </span>
                       <span className="text-[10px] text-zinc-500 font-serif italic">Archival System</span>
@@ -263,7 +264,7 @@ export const SidebarLeft: React.FC = () => {
                </div>
                <button 
                   onClick={toggleSidebar} 
-                  className="text-zinc-600 hover:text-[#355e3b] transition-colors p-1"
+                  className="text-zinc-600 hover:text-owp-green transition-colors p-1"
                   title="Collapse"
                >
                   <PanelLeftClose size={20} />
@@ -275,28 +276,28 @@ export const SidebarLeft: React.FC = () => {
             
             {/* Analysis Section */}
             <div className="space-y-3">
-              <label className="text-[10px] font-bold text-[#355e3b] uppercase tracking-[0.2em] font-spectral opacity-80 pl-1">
+              <label className="text-[10px] font-bold text-owp-green uppercase tracking-[0.2em] font-spectral opacity-80 pl-1">
                 Analysis Protocols
               </label>
               <div className="grid grid-cols-1 gap-2">
                 <button onClick={handleRunMetrics} className="btn-zinc group justify-between">
-                   <div className="flex items-center gap-2"><Play size={16} className="text-[#355e3b] group-hover:text-white transition-colors"/> Analiza i Rozwój Grafu</div>
-                   <div className="w-1.5 h-1.5 rounded-full bg-[#355e3b] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                   <div className="flex items-center gap-2"><Play size={16} className="text-owp-green group-hover:text-white transition-colors"/> Analiza i Rozwój Grafu</div>
+                   <div className="w-1.5 h-1.5 rounded-full bg-owp-green opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 </button>
                 <button onClick={() => setSemanticSearchOpen(true)} className="btn-zinc group justify-between">
-                   <div className="flex items-center gap-2"><Search size={16} className="text-[#355e3b] group-hover:text-white transition-colors"/> Wyszukiwanie Semantyczne</div>
+                   <div className="flex items-center gap-2"><Search size={16} className="text-owp-green group-hover:text-white transition-colors"/> Wyszukiwanie Semantyczne</div>
                 </button>
                 <button onClick={() => setShowStatsPanel(true)} className="btn-zinc group justify-between">
-                   <div className="flex items-center gap-2"><Activity size={16} className="text-[#355e3b] group-hover:text-white transition-colors"/> Graph Dashboard</div>
+                   <div className="flex items-center gap-2"><Activity size={16} className="text-owp-green group-hover:text-white transition-colors"/> Graph Dashboard</div>
                 </button>
                 <button onClick={runRegionalAnalysis} className="btn-zinc group justify-between">
-                   <div className="flex items-center gap-2"><Map size={16} className="text-[#355e3b] group-hover:text-white transition-colors"/> Regional Analysis</div>
+                   <div className="flex items-center gap-2"><Map size={16} className="text-owp-green group-hover:text-white transition-colors"/> Regional Analysis</div>
                 </button>
                 {regionalAnalysis && (
-                  <div className="px-3 py-2 bg-[#355e3b]/10 border-l-2 border-[#355e3b] text-xs animate-in fade-in slide-in-from-left-2">
+                  <div className="px-3 py-2 bg-owp-green/10 border-l-2 border-owp-green text-xs animate-in fade-in slide-in-from-left-2">
                     <div className="flex justify-between items-center">
-                       <span className="text-[#355e3b] font-bold">Isolation Index</span> 
-                       <span className="font-mono text-white bg-[#355e3b]/20 px-1 rounded">{(regionalAnalysis.isolationIndex * 100).toFixed(1)}%</span>
+                       <span className="text-owp-green font-bold">Isolation Index</span> 
+                       <span className="font-mono text-white bg-owp-green/20 px-1 rounded">{(regionalAnalysis.isolationIndex * 100).toFixed(1)}%</span>
                     </div>
                   </div>
                 )}
@@ -305,7 +306,7 @@ export const SidebarLeft: React.FC = () => {
 
             {/* AI Agents Section */}
             <div className="space-y-3">
-              <label className="text-[10px] font-bold text-[#355e3b] uppercase tracking-[0.2em] font-spectral opacity-80 pl-1">
+              <label className="text-[10px] font-bold text-owp-green uppercase tracking-[0.2em] font-spectral opacity-80 pl-1">
                 AI Agents
               </label>
               <div className="grid grid-cols-1 gap-2">
@@ -320,48 +321,48 @@ export const SidebarLeft: React.FC = () => {
 
             {/* Visualization Section */}
             <div className="space-y-3">
-              <label className="text-[10px] font-bold text-[#355e3b] uppercase tracking-[0.2em] font-spectral opacity-80 pl-1">
+              <label className="text-[10px] font-bold text-owp-green uppercase tracking-[0.2em] font-spectral opacity-80 pl-1">
                 Visual Layers
               </label>
               
-              <div className="flex items-center justify-between px-3 py-2.5 bg-[#09090b] border border-[#355e3b]/20 rounded-sm hover:border-[#355e3b]/40 transition-colors">
+              <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-950 border border-owp-green/20 rounded-sm hover:border-owp-green/40 transition-colors">
                 <span className="text-sm text-zinc-300">Community Colors</span>
                 <button 
                   onClick={() => setCommunityColoring(!activeCommunityColoring)} 
-                  className={`w-9 h-5 rounded-full relative transition-colors duration-300 ${activeCommunityColoring ? 'bg-[#355e3b]' : 'bg-zinc-800'}`}
+                  className={`w-9 h-5 rounded-full relative transition-colors duration-300 ${activeCommunityColoring ? 'bg-owp-green' : 'bg-zinc-800'}`}
                 >
                   <div className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-all duration-300 shadow-md ${activeCommunityColoring ? 'left-5' : 'left-1'}`}></div>
                 </button>
               </div>
               
-              <div className="flex items-center justify-between px-3 py-2.5 bg-[#09090b] border border-[#355e3b]/20 rounded-sm hover:border-[#355e3b]/40 transition-colors">
-                <span className="text-sm text-zinc-300 flex items-center gap-2"><ShieldAlert size={14} className={showCertainty ? "text-[#b45309]" : "text-zinc-600"}/> Evidence Mode</span>
+              <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-950 border border-owp-green/20 rounded-sm hover:border-owp-green/40 transition-colors">
+                <span className="text-sm text-zinc-300 flex items-center gap-2"><ShieldAlert size={14} className={showCertainty ? "text-archival-gold" : "text-zinc-600"}/> Evidence Mode</span>
                 <button 
                   onClick={() => setCertaintyMode(!showCertainty)} 
-                  className={`w-9 h-5 rounded-full relative transition-colors duration-300 ${showCertainty ? 'bg-[#b45309]' : 'bg-zinc-800'}`}
+                  className={`w-9 h-5 rounded-full relative transition-colors duration-300 ${showCertainty ? 'bg-archival-gold' : 'bg-zinc-800'}`}
                 >
                   <div className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-all duration-300 shadow-md ${showCertainty ? 'left-5' : 'left-1'}`}></div>
                 </button>
               </div>
 
-               <div className="flex items-center justify-between px-3 py-2.5 bg-[#09090b] border border-[#355e3b]/20 rounded-sm hover:border-[#355e3b]/40 transition-colors">
-                <span className="text-sm text-zinc-300 flex items-center gap-2"><Group size={14} className={isGroupedByRegion ? "text-[#b45309]" : "text-zinc-600"}/> Group By Region</span>
+               <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-950 border border-owp-green/20 rounded-sm hover:border-owp-green/40 transition-colors">
+                <span className="text-sm text-zinc-300 flex items-center gap-2"><Group size={14} className={isGroupedByRegion ? "text-archival-gold" : "text-zinc-600"}/> Group By Region</span>
                 <button 
                   onClick={() => setGroupedByRegion(!isGroupedByRegion)} 
-                  className={`w-9 h-5 rounded-full relative transition-colors duration-300 ${isGroupedByRegion ? 'bg-[#b45309]' : 'bg-zinc-800'}`}
+                  className={`w-9 h-5 rounded-full relative transition-colors duration-300 ${isGroupedByRegion ? 'bg-archival-gold' : 'bg-zinc-800'}`}
                 >
                   <div className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-all duration-300 shadow-md ${isGroupedByRegion ? 'left-5' : 'left-1'}`}></div>
                 </button>
               </div>
 
               {/* Layout Engine Selector */}
-               <div className="px-3 py-2.5 bg-[#09090b] border border-[#355e3b]/20 rounded-sm hover:border-[#355e3b]/40 transition-colors">
+               <div className="px-3 py-2.5 bg-zinc-950 border border-owp-green/20 rounded-sm hover:border-owp-green/40 transition-colors">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm text-zinc-300 flex items-center gap-2"><LayoutGrid size={14} className="text-zinc-500"/> Layout Engine</span>
                   <select 
                     value={activeLayout}
                     onChange={(e) => setLayout(e.target.value)}
-                    className="bg-zinc-900 text-xs text-white border border-zinc-700 rounded px-2 py-1 outline-none focus:border-[#b45309] w-28"
+                    className="bg-zinc-900 text-xs text-white border border-zinc-700 rounded px-2 py-1 outline-none focus:border-archival-gold w-28"
                   >
                      <option value="cola">Cola (Physics)</option>
                      <option value="cose">Cose (Spring)</option>
@@ -378,13 +379,13 @@ export const SidebarLeft: React.FC = () => {
                      {(activeLayout === 'cola' || activeLayout === 'cose') && (
                         <div className="space-y-1">
                            <div className="flex justify-between text-[10px] text-zinc-500 uppercase tracking-wider">
-                              <span>Gravity</span> <span className="text-[#355e3b]">{layoutParams.gravity.toFixed(2)}</span>
+                              <span>Gravity</span> <span className="text-owp-green">{layoutParams.gravity.toFixed(2)}</span>
                            </div>
                            <input 
                               type="range" min="0.05" max="1" step="0.05" 
                               value={layoutParams.gravity} 
                               onChange={(e) => setLayoutParams({ gravity: parseFloat(e.target.value) })}
-                              className="w-full h-1 bg-zinc-800 rounded appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#b45309] [&::-webkit-slider-thumb]:cursor-pointer"
+                              className="w-full h-1 bg-zinc-800 rounded appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-archival-gold [&::-webkit-slider-thumb]:cursor-pointer"
                            />
                         </div>
                      )}
@@ -392,13 +393,13 @@ export const SidebarLeft: React.FC = () => {
                      {activeLayout === 'cola' && (
                        <div className="space-y-1">
                          <div className="flex justify-between text-[10px] text-zinc-500 uppercase tracking-wider">
-                            <span>Friction</span> <span className="text-[#355e3b]">{layoutParams.friction.toFixed(2)}</span>
+                            <span>Friction</span> <span className="text-owp-green">{layoutParams.friction.toFixed(2)}</span>
                          </div>
                          <input 
                            type="range" min="0.1" max="0.9" step="0.1" 
                            value={layoutParams.friction} 
                            onChange={(e) => setLayoutParams({ friction: parseFloat(e.target.value) })}
-                           className="w-full h-1 bg-zinc-800 rounded appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#b45309] [&::-webkit-slider-thumb]:cursor-pointer"
+                           className="w-full h-1 bg-zinc-800 rounded appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-archival-gold [&::-webkit-slider-thumb]:cursor-pointer"
                          />
                        </div>
                      )}
@@ -407,24 +408,24 @@ export const SidebarLeft: React.FC = () => {
                        <>
                          <div className="space-y-1">
                            <div className="flex justify-between text-[10px] text-zinc-500 uppercase tracking-wider">
-                              <span>Repulsion</span> <span className="text-[#355e3b]">{layoutParams.nodeRepulsion.toLocaleString()}</span>
+                              <span>Repulsion</span> <span className="text-owp-green">{layoutParams.nodeRepulsion.toLocaleString()}</span>
                            </div>
                            <input 
                              type="range" min="100000" max="1000000" step="10000" 
                              value={layoutParams.nodeRepulsion} 
                              onChange={(e) => setLayoutParams({ nodeRepulsion: parseFloat(e.target.value) })}
-                             className="w-full h-1 bg-zinc-800 rounded appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#b45309] [&::-webkit-slider-thumb]:cursor-pointer"
+                             className="w-full h-1 bg-zinc-800 rounded appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-archival-gold [&::-webkit-slider-thumb]:cursor-pointer"
                            />
                          </div>
                          <div className="space-y-1">
                            <div className="flex justify-between text-[10px] text-zinc-500 uppercase tracking-wider">
-                              <span>Edge Length</span> <span className="text-[#355e3b]">{layoutParams.idealEdgeLength}</span>
+                              <span>Edge Length</span> <span className="text-owp-green">{layoutParams.idealEdgeLength}</span>
                            </div>
                            <input 
                              type="range" min="20" max="300" step="10" 
                              value={layoutParams.idealEdgeLength} 
                              onChange={(e) => setLayoutParams({ idealEdgeLength: parseFloat(e.target.value) })}
-                             className="w-full h-1 bg-zinc-800 rounded appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#b45309] [&::-webkit-slider-thumb]:cursor-pointer"
+                             className="w-full h-1 bg-zinc-800 rounded appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-archival-gold [&::-webkit-slider-thumb]:cursor-pointer"
                            />
                          </div>
                        </>
@@ -432,13 +433,13 @@ export const SidebarLeft: React.FC = () => {
 
                      <div className="space-y-1">
                        <div className="flex justify-between text-[10px] text-zinc-500 uppercase tracking-wider">
-                          <span>Node Spacing</span> <span className="text-[#355e3b]">{layoutParams.spacing.toFixed(1)}x</span>
+                          <span>Node Spacing</span> <span className="text-owp-green">{layoutParams.spacing.toFixed(1)}x</span>
                        </div>
                        <input 
                          type="range" min="0.5" max="3" step="0.1" 
                          value={layoutParams.spacing} 
                          onChange={(e) => setLayoutParams({ spacing: parseFloat(e.target.value) })}
-                         className="w-full h-1 bg-zinc-800 rounded appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#b45309] [&::-webkit-slider-thumb]:cursor-pointer"
+                         className="w-full h-1 bg-zinc-800 rounded appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-archival-gold [&::-webkit-slider-thumb]:cursor-pointer"
                        />
                      </div>
                   </div>
@@ -448,27 +449,27 @@ export const SidebarLeft: React.FC = () => {
 
             {/* Selection Panel */}
             {selectedNodeIds.length > 0 && (
-              <div className="p-4 bg-[#355e3b]/5 border border-[#355e3b]/30 rounded-sm space-y-3 animate-in slide-in-from-left-4 backdrop-blur-sm">
-                  <div className="flex justify-between items-center border-b border-[#355e3b]/20 pb-2">
-                    <h3 className="text-sm font-bold text-[#355e3b] font-spectral tracking-wide">{selectedNodeIds.length} Selected</h3>
+              <div className="p-4 bg-owp-green/5 border border-owp-green/30 rounded-sm space-y-3 animate-in slide-in-from-left-4 backdrop-blur-sm">
+                  <div className="flex justify-between items-center border-b border-owp-green/20 pb-2">
+                    <h3 className="text-sm font-bold text-owp-green font-spectral tracking-wide">{selectedNodeIds.length} Selected</h3>
                     <button onClick={clearSelection} className="text-zinc-500 hover:text-white transition-colors"><X size={14}/></button>
                   </div>
                   
                   {selectedNodeIds.length === 1 && selectedNode && (
                     <div className="space-y-3 text-xs text-zinc-400">
                       <p className="font-bold text-zinc-100 text-lg font-spectral leading-tight">{selectedNode.label}</p>
-                      <p className="italic border-l-2 border-[#b45309] pl-3 text-zinc-400">{selectedNode.description}</p>
+                      <p className="italic border-l-2 border-archival-gold pl-3 text-zinc-400">{selectedNode.description}</p>
                       
-                      <div className="grid grid-cols-2 gap-y-2 gap-x-4 pt-2 border-t border-[#355e3b]/10">
+                      <div className="grid grid-cols-2 gap-y-2 gap-x-4 pt-2 border-t border-owp-green/10">
                          <div className="flex justify-between"><span>Centrality:</span> <span className="text-white font-mono">{(selectedNode.degreeCentrality || 0).toFixed(2)}</span></div>
                          <div className="flex justify-between"><span>PageRank:</span> <span className="text-white font-mono">{(selectedNode.pagerank || 0).toFixed(2)}</span></div>
-                         <div className="col-span-2 text-[#355e3b] flex justify-between font-bold bg-[#355e3b]/10 px-1.5 py-0.5 rounded">
+                         <div className="col-span-2 text-owp-green flex justify-between font-bold bg-owp-green/10 px-1.5 py-0.5 rounded">
                            <span>Community:</span> <span>#{selectedNode.louvainCommunity}</span>
                          </div>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-2 pt-2">
-                        <button onClick={handleDeepen} className="btn-zinc justify-center text-[#355e3b] border-[#355e3b]/40 hover:bg-[#355e3b] hover:text-white">
+                        <button onClick={handleDeepen} className="btn-zinc justify-center text-owp-green border-owp-green/40 hover:bg-owp-green hover:text-white">
                            <BookOpenCheck size={14}/> Research
                         </button>
                         <button onClick={() => setEditingNode(selectedNode.id)} className="btn-zinc justify-center">
@@ -480,14 +481,14 @@ export const SidebarLeft: React.FC = () => {
 
                   {selectedNodeIds.length > 1 && (
                     <div className="space-y-2">
-                      <button onClick={bulkDeleteSelection} className="w-full btn-zinc bg-[#be123c]/10 text-[#be123c] border-[#be123c]/40 hover:bg-[#be123c] hover:text-white hover:border-[#be123c]"><Trash2 size={14}/> Delete Selection</button>
+                      <button onClick={bulkDeleteSelection} className="w-full btn-zinc bg-crimson/10 text-crimson border-crimson/40 hover:bg-crimson hover:text-white hover:border-crimson"><Trash2 size={14}/> Delete Selection</button>
                     </div>
                   )}
               </div>
             )}
           </div>
           
-          <div className="mt-auto pt-6 border-t border-[#355e3b]/20 space-y-2">
+          <div className="mt-auto pt-6 border-t border-owp-green/20 space-y-2">
             <button onClick={handleExportJSON} className="w-full btn-zinc text-xs text-zinc-500 hover:text-white border-zinc-800"><FileJson size={14}/> Export Full JSON</button>
             <button onClick={handleExportObsidian} className="w-full btn-zinc text-xs text-zinc-500 hover:text-white border-zinc-800"><FileJson size={14}/> Eksportuj do Obsidian</button>
             <div className="text-center text-[10px] text-zinc-700 font-mono pt-2">v4.2.0 • Endecja GraphLab</div>
@@ -497,7 +498,7 @@ export const SidebarLeft: React.FC = () => {
         {/* Drag Handle */}
         <div 
           onMouseDown={startResizing}
-          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-[#355e3b] z-50 transition-colors duration-300 ${isResizing ? 'bg-[#355e3b]' : 'bg-[#355e3b]/0'}`}
+          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-owp-green z-50 transition-colors duration-300 ${isResizing ? 'bg-owp-green' : 'bg-owp-green/0'}`}
         />
       </div>
 
@@ -510,20 +511,20 @@ export const SidebarLeft: React.FC = () => {
 
 const DupeModal = ({ candidates, onClose, onMerge }: any) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-    <div className="bg-[#0c0c0e] border border-[#355e3b]/30 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-      <div className="p-4 border-b border-[#355e3b]/20 flex justify-between items-center">
-        <h3 className="text-lg font-bold text-white font-spectral flex items-center gap-2"><Scissors size={18} className="text-[#355e3b]"/> Semantic Review ({candidates.length})</h3>
+    <div className="bg-surface border border-owp-green/30 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+      <div className="p-4 border-b border-owp-green/20 flex justify-between items-center">
+        <h3 className="text-lg font-bold text-white font-spectral flex items-center gap-2"><Scissors size={18} className="text-owp-green"/> Semantic Review ({candidates.length})</h3>
         <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors"><X size={20}/></button>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {candidates.map((cand: any, i: number) => (
-          <div key={i} className="bg-[#09090b] p-4 rounded border border-zinc-800 flex gap-4 items-center group hover:border-[#355e3b]/40 transition-colors">
+          <div key={i} className="bg-zinc-950 p-4 rounded border border-zinc-800 flex gap-4 items-center group hover:border-owp-green/40 transition-colors">
             <div className="flex-1 space-y-1">
-              <div className="flex justify-between"><span className="text-sm font-bold text-[#b45309]">{cand.nodeA.label}</span></div>
-              <div className="flex justify-between"><span className="text-sm font-bold text-[#b45309] opacity-70">{cand.nodeB.label}</span></div>
+              <div className="flex justify-between"><span className="text-sm font-bold text-archival-gold">{cand.nodeA.label}</span></div>
+              <div className="flex justify-between"><span className="text-sm font-bold text-archival-gold opacity-70">{cand.nodeB.label}</span></div>
               <div className="text-xs text-zinc-500 font-serif italic border-l-2 border-zinc-800 pl-2 mt-2">{cand.reason}</div>
             </div>
-            <button onClick={() => onMerge(cand)} className="btn-zinc text-[#355e3b] border-[#355e3b]/30 hover:bg-[#355e3b] hover:text-white"><GitMerge size={14} /> Merge</button>
+            <button onClick={() => onMerge(cand)} className="btn-zinc text-owp-green border-owp-green/30 hover:bg-owp-green hover:text-white"><GitMerge size={14} /> Merge</button>
           </div>
         ))}
       </div>
