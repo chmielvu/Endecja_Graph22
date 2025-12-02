@@ -1,3 +1,4 @@
+
 import { KnowledgeGraph, GraphNode, GraphEdge } from './types';
 
 // Theme Constants (Must match index.html Tailwind config)
@@ -826,6 +827,20 @@ const getYear = (node: any): number | undefined => {
   return undefined;
 };
 
+// Helper for TKG: Parse Start/End
+const parseDates = (dateStr?: string): { start?: number, end?: number } => {
+  if (!dateStr) return {};
+  const years = dateStr.match(/\d{4}/g);
+  if (!years) return {};
+  
+  if (years.length >= 2) {
+    return { start: parseInt(years[0]), end: parseInt(years[1]) };
+  } else if (years.length === 1) {
+    return { start: parseInt(years[0]) };
+  }
+  return {};
+};
+
 const getCertainty = (node: any): 'confirmed' | 'disputed' | 'alleged' => node.certainty || 'confirmed';
 
 const getSources = (n: any) => {
@@ -861,17 +876,22 @@ const nodeIds = new Set(DATA.nodes.map(n => n.id));
 
 const mappedEdges: GraphEdge[] = DATA.edges
   .filter((e: any) => e && nodeIds.has(e.source) && nodeIds.has(e.target)) // Ensure referential integrity and non-null edge
-  .map((e: any, i: number) => ({
-    data: {
-      id: `edge_${i}_${e.source}_${e.target}`,
-      source: e.source,
-      target: e.target,
-      label: e.label || (e as any).relationship || 'related',
-      dates: (e as any).dates,
-      sign: ((e as any).sign || 'positive') as 'positive' | 'negative',
-      certainty: 'confirmed' as const
-    }
-  }));
+  .map((e: any, i: number) => {
+    const { start, end } = parseDates((e as any).dates);
+    return {
+      data: {
+        id: `edge_${i}_${e.source}_${e.target}`,
+        source: e.source,
+        target: e.target,
+        label: e.label || (e as any).relationship || 'related',
+        dates: (e as any).dates,
+        validFrom: start,
+        validTo: end,
+        sign: ((e as any).sign || 'positive') as 'positive' | 'negative',
+        certainty: 'confirmed' as const
+      }
+    };
+  });
 
 export const INITIAL_GRAPH: KnowledgeGraph = {
   nodes: mappedNodes,

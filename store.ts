@@ -1,9 +1,8 @@
 
-
 import { create } from 'zustand';
 import { AppState, KnowledgeGraph, NodeData, ChatMessage, Toast, RegionalAnalysisResult, DuplicateCandidate, GraphPatch, ResearchTask, GraphNode, GraphEdge, LayoutParams } from './types';
 import { INITIAL_GRAPH } from './constants';
-import { enrichGraphWithMetrics, calculateRegionalMetrics } from './services/graphService';
+import { enrichGraphWithMetricsAsync, calculateRegionalMetrics } from './services/graphService';
 import { storage } from './services/storage';
 
 interface HistoryState {
@@ -17,11 +16,11 @@ interface Store extends AppState {
   
   // Graph Mutation
   addNodesAndEdges: (nodes: any[], edges: any[]) => void;
-  applyPatch: (nodes: Partial<NodeData>[], edges: any[]) => void; // New robust patch applicator
+  applyPatch: (nodes: Partial<NodeData>[], edges: any[]) => void;
   removeNode: (nodeId: string) => void;
   updateNode: (id: string, data: Partial<NodeData>) => void;
   mergeNodes: (keepId: string, dropId: string) => void;
-  recalculateGraph: () => void;
+  recalculateGraph: () => Promise<void>;
   
   // Bulk Actions
   toggleNodeSelection: (id: string, multi?: boolean) => void;
@@ -32,7 +31,6 @@ interface Store extends AppState {
   setFilterYear: (year: number | null) => void;
   toggleSidebar: () => void;
   
-  // Right Sidebar & Timeline Controls
   isRightSidebarOpen: boolean;
   toggleRightSidebar: () => void;
   isPlaying: boolean;
@@ -40,7 +38,8 @@ interface Store extends AppState {
 
   setCommunityColoring: (active: boolean) => void;
   setCertaintyMode: (active: boolean) => void;
-  setGroupedByRegion: (active: boolean) => void; // NEW
+  setSecurityMode: (active: boolean) => void; 
+  setGroupedByRegion: (active: boolean) => void; 
   setLayout: (layout: string) => void;
   setLayoutParams: (params: Partial<LayoutParams>) => void;
   runRegionalAnalysis: () => void;
@@ -50,20 +49,17 @@ interface Store extends AppState {
   addResearchTask: (task: ResearchTask) => void;
   updateResearchTask: (id: string, updates: Partial<ResearchTask>) => void;
   
-  // UI
   setEditingNode: (id: string | null) => void;
   addMessage: (msg: ChatMessage) => void;
   setThinking: (isThinking: boolean) => void;
   addToast: (toast: Omit<Toast, 'id'>) => void;
   removeToast: (id: string) => void;
 
-  // History Actions
   undo: () => void;
   redo: () => void;
   _history: HistoryState;
   pushHistory: () => void;
   
-  // Tier-4 Deepening
   deepeningNodeId: string | null;
   setDeepeningNode: (id: string | null) => void;
 }
@@ -79,8 +75,9 @@ export const useStore = create<Store>((set, get) => ({
   metricsCalculated: false,
   activeCommunityColoring: true,
   showCertainty: false,
-  isGroupedByRegion: false, // Default off
-  activeLayout: 'grid', // Updated default to grid
+  isSecurityMode: false,
+  isGroupedByRegion: false,
+  activeLayout: 'grid', 
   layoutParams: { 
     gravity: 0.25, 
     friction: 0.6, 
@@ -89,15 +86,10 @@ export const useStore = create<Store>((set, get) => ({
     idealEdgeLength: 100
   },
   minDegreeFilter: 0,
-  
-  // Sidebar States
   isSidebarOpen: true,
   isRightSidebarOpen: true,
-  
-  // Timeline State
   timelineYear: null,
   isPlaying: false,
-
   regionalAnalysis: null,
   showStatsPanel: false,
   isSemanticSearchOpen: false,
@@ -105,14 +97,12 @@ export const useStore = create<Store>((set, get) => ({
     { 
       id: 'welcome', 
       role: 'assistant', 
-      content: 'Witaj w Endecja KG Builder Tier-4. Platforma badawcza gotowa. Czekam na polecenia.', 
+      content: 'Witaj w Endecja KG Builder Tier-4. Platforma badawcza gotowa.', 
       timestamp: Date.now() 
     }
   ],
   isThinking: false,
   toasts: [],
-  
-  // History State
   _history: { past: [], future: [] },
 
   canUndo: () => get()._history.past.length > 0,
@@ -120,7 +110,6 @@ export const useStore = create<Store>((set, get) => ({
 
   pushHistory: () => {
     const { graph, _history } = get();
-    // Limit history to 50 steps
     const newPast = [JSON.parse(JSON.stringify(graph)), ..._history.past].slice(0, 50);
     set({ _history: { past: newPast, future: [] } });
   },
@@ -128,18 +117,13 @@ export const useStore = create<Store>((set, get) => ({
   undo: () => {
     const { _history } = get();
     if (_history.past.length === 0) return;
-
     const previous = _history.past[0];
     const newPast = _history.past.slice(1);
     const current = get().graph;
-
     set({ 
       graph: previous, 
       filteredGraph: previous,
-      _history: { 
-        past: newPast, 
-        future: [current, ..._history.future] 
-      } 
+      _history: { past: newPast, future: [current, ..._history.future] } 
     });
     storage.save(previous);
   },
@@ -147,18 +131,13 @@ export const useStore = create<Store>((set, get) => ({
   redo: () => {
     const { _history } = get();
     if (_history.future.length === 0) return;
-
     const next = _history.future[0];
     const newFuture = _history.future.slice(1);
     const current = get().graph;
-
     set({ 
       graph: next, 
       filteredGraph: next,
-      _history: { 
-        past: [current, ..._history.past], 
-        future: newFuture 
-      } 
+      _history: { past: [current, ..._history.past], future: newFuture } 
     });
     storage.save(next);
   },
@@ -168,30 +147,27 @@ export const useStore = create<Store>((set, get) => ({
       const currentVersion = INITIAL_GRAPH.meta?.version || "1.0";
       const stored = await get().loadFromStorage();
       
-      // Auto-hydrate if empty OR if version mismatch (forced upgrade)
       if (!stored || (stored.meta?.version !== currentVersion)) {
-        console.log(`Hydrating Initial Graph. Stored: ${stored?.meta?.version}, Current: ${currentVersion}`);
-        // If enrichment fails, this might throw
-        const enriched = enrichGraphWithMetrics(INITIAL_GRAPH);
-        set({ graph: enriched, filteredGraph: enriched, metricsCalculated: true });
-        get().addToast({ title: 'Database Updated', description: `Loaded Knowledge Base v${currentVersion}`, type: 'success' });
+        console.log(`Hydrating Initial Graph. Version: ${currentVersion}`);
+        // Async metric calc
+        set({ isThinking: true });
+        const enriched = await enrichGraphWithMetricsAsync(INITIAL_GRAPH);
+        set({ graph: enriched, filteredGraph: enriched, metricsCalculated: true, isThinking: false });
+        get().addToast({ title: 'System Ready', description: `Loaded Base Knowledge.`, type: 'success' });
         storage.save(enriched, currentVersion);
       } else {
-         // Load from storage if version matches
          set({ graph: stored, filteredGraph: stored, metricsCalculated: true });
       }
       
-      // Auto-save loop
       setInterval(() => {
         const { graph } = get();
         if (graph.nodes.length > 0) storage.save(graph);
       }, 10000);
 
     } catch (e: any) {
-      console.error("Initialization Error (using raw fallback):", e);
-      get().addToast({ title: 'System Notice', description: `Loaded basic graph due to metric error.`, type: 'warning' });
-      // Fallback to raw initial graph without metrics if enrichment fails
-      set({ graph: INITIAL_GRAPH, filteredGraph: INITIAL_GRAPH, metricsCalculated: false });
+      console.error("Initialization Error:", e);
+      get().addToast({ title: 'Metric Error', description: `Loaded basic graph.`, type: 'warning' });
+      set({ graph: INITIAL_GRAPH, filteredGraph: INITIAL_GRAPH, metricsCalculated: false, isThinking: false });
     }
   },
 
@@ -199,39 +175,40 @@ export const useStore = create<Store>((set, get) => ({
     try {
       const data = await storage.load();
       if (data) {
-        // Just return the graph, initGraph decides whether to use it
         return { ...data.graph, meta: { ...data.graph.meta, version: data.version } };
       }
       return null;
     } catch (e) {
-      console.error("Failed to load from storage", e);
       return null;
     }
   },
 
-  recalculateGraph: () => {
+  recalculateGraph: async () => {
+    set({ isThinking: true });
     const { graph } = get();
-    const enriched = enrichGraphWithMetrics(graph);
-    set({ graph: enriched, filteredGraph: enriched, metricsCalculated: true });
-    storage.save(enriched);
+    try {
+       const enriched = await enrichGraphWithMetricsAsync(graph);
+       set({ graph: enriched, filteredGraph: enriched, metricsCalculated: true, isThinking: false });
+       storage.save(enriched);
+    } catch (e) {
+       console.error("Metric recalc failed", e);
+       set({ isThinking: false });
+    }
   },
 
-  // Simplified Add - mostly for legacy or direct adds
   addNodesAndEdges: (newNodesRaw, newEdgesRaw) => {
      get().applyPatch(newNodesRaw, newEdgesRaw);
   },
 
-  // Robust Patch Application (Upsert Logic)
-  applyPatch: (patchNodes, patchEdges) => {
+  applyPatch: async (patchNodes, patchEdges) => {
     get().pushHistory();
     const { graph } = get();
+    set({ isThinking: true });
 
-    // 1. Process Nodes (Upsert)
     const existingNodeMap = new Map<string, GraphNode>(graph.nodes.map(n => [n.data.id, n]));
     
     patchNodes.forEach(pn => {
       if (!pn.id) return;
-      
       let year = pn.year;
       if (!year && typeof pn.dates === 'string') {
         const match = pn.dates.match(/\d{4}/);
@@ -239,19 +216,12 @@ export const useStore = create<Store>((set, get) => ({
       }
       
       if (existingNodeMap.has(pn.id)) {
-        // Update Existing
         const existing = existingNodeMap.get(pn.id)!;
         existingNodeMap.set(pn.id, {
           ...existing,
-          data: { 
-            ...existing.data, 
-            ...pn,
-            id: pn.id, // Ensure ID is preserved
-            year: year || existing.data.year 
-          } as NodeData
+          data: { ...existing.data, ...pn, id: pn.id, year: year || existing.data.year } as NodeData
         });
       } else {
-        // Create New
         existingNodeMap.set(pn.id, {
           data: {
             id: pn.id,
@@ -268,7 +238,6 @@ export const useStore = create<Store>((set, get) => ({
       }
     });
 
-    // 2. Process Edges
     const newEdges: GraphEdge[] = patchEdges.map(e => ({
       data: {
         id: e.id || `edge_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
@@ -281,12 +250,10 @@ export const useStore = create<Store>((set, get) => ({
       }
     }));
 
-    // Filter edges to ensure both source/target exist
     const validNewEdges = newEdges.filter(e => 
       existingNodeMap.has(e.data.source) && existingNodeMap.has(e.data.target)
     );
 
-    // Merge edges, avoiding exact duplicates (same source, target, and label)
     const existingEdges = graph.edges;
     const finalEdges = [...existingEdges];
     
@@ -296,9 +263,7 @@ export const useStore = create<Store>((set, get) => ({
         ex.data.target === newEdge.data.target && 
         ex.data.label === newEdge.data.label
       );
-      if (!isDuplicate) {
-        finalEdges.push(newEdge);
-      }
+      if (!isDuplicate) finalEdges.push(newEdge);
     });
 
     const updatedGraph: KnowledgeGraph = {
@@ -306,18 +271,24 @@ export const useStore = create<Store>((set, get) => ({
       edges: finalEdges
     };
 
-    const enriched = enrichGraphWithMetrics(updatedGraph);
-    set({ graph: enriched, filteredGraph: enriched, pendingPatch: null });
-    storage.save(enriched);
+    try {
+        const enriched = await enrichGraphWithMetricsAsync(updatedGraph);
+        set({ graph: enriched, filteredGraph: enriched, pendingPatch: null, isThinking: false });
+        storage.save(enriched);
+    } catch(e) {
+        set({ isThinking: false });
+        get().addToast({ title: 'Metric Error', description: 'Saved without full analytics.', type: 'warning' });
+        set({ graph: updatedGraph, filteredGraph: updatedGraph, pendingPatch: null });
+        storage.save(updatedGraph);
+    }
   },
 
   updateNode: (id, data) => {
     get().pushHistory();
     const { graph } = get();
-    const newNodes = graph.nodes.map(n => 
-      n.data.id === id ? { ...n, data: { ...n.data, ...data } } : n
-    );
+    const newNodes = graph.nodes.map(n => n.data.id === id ? { ...n, data: { ...n.data, ...data } } : n);
     const newGraph = { ...graph, nodes: newNodes };
+    // Optimistic update (no recalc)
     set({ graph: newGraph, filteredGraph: newGraph });
     storage.save(newGraph);
   },
@@ -327,9 +298,9 @@ export const useStore = create<Store>((set, get) => ({
     const { graph } = get();
     const newNodes = graph.nodes.filter(n => n.data.id !== nodeId);
     const newEdges = graph.edges.filter(e => e.data.source !== nodeId && e.data.target !== nodeId);
-    const enriched = enrichGraphWithMetrics({ nodes: newNodes, edges: newEdges });
-    set({ graph: enriched, filteredGraph: enriched, selectedNodeIds: [] });
-    storage.save(enriched);
+    const newGraph = { ...graph, nodes: newNodes, edges: newEdges };
+    set({ graph: newGraph, filteredGraph: newGraph, selectedNodeIds: [] });
+    get().recalculateGraph(); // Trigger background recalc
   },
 
   bulkDeleteSelection: () => {
@@ -340,36 +311,23 @@ export const useStore = create<Store>((set, get) => ({
     const newNodes = graph.nodes.filter(n => !selectedNodeIds.includes(n.data.id));
     const newEdges = graph.edges.filter(e => !selectedNodeIds.includes(e.data.source) && !selectedNodeIds.includes(e.data.target));
     
-    const enriched = enrichGraphWithMetrics({ nodes: newNodes, edges: newEdges });
-    set({ graph: enriched, filteredGraph: enriched, selectedNodeIds: [] });
+    const newGraph = { ...graph, nodes: newNodes, edges: newEdges };
+    set({ graph: newGraph, filteredGraph: newGraph, selectedNodeIds: [] });
     get().addToast({ title: 'Bulk Delete', description: `Removed ${selectedNodeIds.length} nodes.`, type: 'info' });
-    storage.save(enriched);
+    get().recalculateGraph();
   },
 
-  // Smart Merge: Preserves data from the dropped node if missing in kept node
   mergeNodes: (keepId, dropId) => {
     get().pushHistory();
     const { graph } = get();
     
     const keepNode = graph.nodes.find(n => n.data.id === keepId);
     const dropNode = graph.nodes.find(n => n.data.id === dropId);
-    
     if (!keepNode || !dropNode) return;
 
-    // Merge Logic: Prefer "Unknown" to be overwritten by specific data
     const newData = { ...keepNode.data };
-    
-    if ((!newData.region || newData.region === 'Unknown') && dropNode.data.region && dropNode.data.region !== 'Unknown') {
-       newData.region = dropNode.data.region;
-    }
-    
-    if (!newData.description && dropNode.data.description) {
-       newData.description = dropNode.data.description;
-    } else if (dropNode.data.description && newData.description && dropNode.data.description.length > newData.description.length) {
-       // Simple heuristic: keep longer description
-       newData.description = dropNode.data.description;
-    }
-    
+    if ((!newData.region || newData.region === 'Unknown') && dropNode.data.region) newData.region = dropNode.data.region;
+    if (!newData.description && dropNode.data.description) newData.description = dropNode.data.description;
     if (!newData.dates && dropNode.data.dates) {
        newData.dates = dropNode.data.dates;
        newData.year = dropNode.data.year;
@@ -382,16 +340,16 @@ export const useStore = create<Store>((set, get) => ({
       return { data: edgeData };
     });
     
-    // Update the kept node
     const updatedNodes = graph.nodes
       .filter(n => n.data.id !== dropId)
       .map(n => n.data.id === keepId ? { ...n, data: newData } : n);
       
     const finalEdges = updatedEdges.filter(e => e.data.source !== e.data.target);
-    const enriched = enrichGraphWithMetrics({ nodes: updatedNodes, edges: finalEdges });
-    set({ graph: enriched, filteredGraph: enriched });
+    const newGraph = { ...graph, nodes: updatedNodes, edges: finalEdges };
+    
+    set({ graph: newGraph, filteredGraph: newGraph });
     get().addToast({ title: 'Merged Nodes', description: `Merged ${dropNode.data.label} into ${keepNode.data.label}`, type: 'success' });
-    storage.save(enriched);
+    get().recalculateGraph();
   },
 
   toggleNodeSelection: (id, multi) => {
@@ -409,6 +367,7 @@ export const useStore = create<Store>((set, get) => ({
 
   clearSelection: () => set({ selectedNodeIds: [] }),
   setEditingNode: (id) => set({ editingNodeId: id }),
+  
   runRegionalAnalysis: () => {
     const { graph } = get();
     const result = calculateRegionalMetrics(graph);
@@ -430,6 +389,7 @@ export const useStore = create<Store>((set, get) => ({
   addMessage: (msg) => set(state => ({ messages: [...state.messages, msg] })),
   setCommunityColoring: (val) => set({ activeCommunityColoring: val }),
   setCertaintyMode: (val) => set({ showCertainty: val }),
+  setSecurityMode: (val) => set({ isSecurityMode: val }),
   setGroupedByRegion: (val) => set({ isGroupedByRegion: val }),
   setLayout: (layout) => set({ activeLayout: layout }),
   setLayoutParams: (params) => set(state => ({ layoutParams: { ...state.layoutParams, ...params } })),

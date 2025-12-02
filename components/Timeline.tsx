@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { Play, Pause, Rewind } from 'lucide-react';
@@ -9,6 +10,16 @@ export const Timeline: React.FC = () => {
   // Continuous range 1880 - 1945 (Endecja Peak Era)
   const MIN_YEAR = 1880;
   const MAX_YEAR = 1945;
+
+  // SOTA Keyframe Events
+  const KEYFRAME_EVENTS = [
+    { year: 1893, label: 'Liga', color: '#355e3b' },
+    { year: 1897, label: 'SND', color: '#b45309' },
+    { year: 1905, label: 'Revol.', color: '#be123c' },
+    { year: 1919, label: 'Versailles', color: '#355e3b' },
+    { year: 1926, label: 'Coup', color: '#be123c' },
+    { year: 1933, label: 'OWP Ban', color: '#be123c' }
+  ];
 
   useEffect(() => {
     if (isPlaying) {
@@ -74,8 +85,8 @@ export const Timeline: React.FC = () => {
       <div className="w-[1px] h-8 bg-zinc-800 mx-2"></div>
 
       {/* Slider Area */}
-      <div className="flex-1 flex flex-col justify-center">
-        <div className="flex justify-between text-[10px] text-zinc-500 font-mono mb-2 uppercase relative">
+      <div className="flex-1 flex flex-col justify-center relative">
+        <div className="flex justify-between text-[10px] text-zinc-500 font-mono mb-2 uppercase relative z-10">
            <span>{MIN_YEAR}</span>
            
            {/* Floating Year Indicator */}
@@ -96,7 +107,24 @@ export const Timeline: React.FC = () => {
            <span>{MAX_YEAR}</span>
         </div>
         
-        <div className="relative w-full h-2 flex items-center">
+        {/* Keyframe Markers (Absolute behind slider) */}
+        <div className="absolute w-full h-8 top-0 pointer-events-none">
+          {KEYFRAME_EVENTS.map(kf => (
+            <div 
+              key={kf.year}
+              className="absolute transform -translate-x-1/2 flex flex-col items-center"
+              style={{ 
+                left: `${((kf.year - MIN_YEAR) / (MAX_YEAR - MIN_YEAR)) * 100}%`,
+                top: '-16px'
+              }}
+            >
+              <div className={`w-1.5 h-1.5 rounded-full`} style={{ backgroundColor: kf.color }} />
+              <span className="text-[8px] text-zinc-600 whitespace-nowrap mt-0.5 opacity-60 font-sans tracking-tight hidden md:block">{kf.label}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="relative w-full h-2 flex items-center mt-1">
           {/* Track Background */}
           <div className="absolute w-full h-1 bg-zinc-800 rounded-lg"></div>
           

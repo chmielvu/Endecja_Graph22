@@ -1,9 +1,11 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useStore } from '../store';
-import { Play, Search, Scissors, X, GitMerge, Map, Activity, Edit2, Trash2, BrainCircuit, Undo2, Redo2, FileJson, BookOpenCheck, ShieldAlert, PanelLeftClose, LayoutGrid, Group } from 'lucide-react';
+import { Play, Search, Scissors, X, GitMerge, Map, Activity, Edit2, Trash2, BrainCircuit, Undo2, Redo2, FileJson, BookOpenCheck, ShieldAlert, PanelLeftClose, LayoutGrid, Group, Eye, Lock, Network, History } from 'lucide-react';
 import { generateGraphExpansion, generateNodeDeepening } from '../services/geminiService';
-import { detectDuplicatesSemantic, detectDuplicates } from '../services/graphService';
+import { buildGraphRAGIndex } from '../services/graphService';
+import { detectDuplicatesSemantic, detectDuplicates } from '../services/metrics';
+import { predictFutureConnections } from '../services/temporalReasoningService';
 import { DuplicateCandidate } from '../types';
 import { MieczykIcon } from './MieczykIcon';
 
@@ -17,6 +19,8 @@ export const SidebarLeft: React.FC = () => {
     setCommunityColoring, 
     showCertainty,
     setCertaintyMode,
+    isSecurityMode,
+    setSecurityMode,
     isGroupedByRegion,
     setGroupedByRegion,
     activeLayout,
@@ -38,7 +42,8 @@ export const SidebarLeft: React.FC = () => {
     setDeepeningNode,
     setPendingPatch,
     addResearchTask,
-    updateResearchTask
+    updateResearchTask,
+    timelineYear
   } = useStore();
 
   const [dupeCandidates, setDupeCandidates] = useState<DuplicateCandidate[]>([]);
@@ -157,6 +162,92 @@ export const SidebarLeft: React.FC = () => {
     } finally {
       setDeepeningNode(null);
       setThinking(false);
+    }
+  };
+
+  const handleGraphRAG = async () => {
+    setThinking(true);
+    const taskId = Date.now().toString();
+    addResearchTask({ id: taskId, type: 'analysis', target: 'Global GraphRAG', status: 'running', reasoning: 'Building hierarchical community summaries...' });
+
+    try {
+        const index = await buildGraphRAGIndex(graph);
+        const summaryCount = index.summaries.length;
+        addToast({ 
+            title: 'GraphRAG Index Built', 
+            description: `Generated ${summaryCount} community insights across ${Object.keys(index.hierarchies).length} levels.`, 
+            type: 'success' 
+        });
+        updateResearchTask(taskId, { status: 'complete', reasoning: `Indexed ${summaryCount} communities.` });
+    } catch (e) {
+        addToast({ title: 'GraphRAG Error', description: 'Failed to build index.', type: 'error' });
+        updateResearchTask(taskId, { status: 'failed', reasoning: 'Indexing failed.' });
+    } finally {
+        setThinking(false);
+    }
+  };
+
+  const handleTemporalPrediction = async () => {
+    const year = timelineYear || 1926;
+    setThinking(true);
+    const taskId = Date.now().toString();
+    addResearchTask({ id: taskId, type: 'analysis', target: `Future Prediction (${year})`, status: 'running', reasoning: 'Analyzing temporal patterns...' });
+
+    try {
+        const predictions = await predictFutureConnections(graph, year);
+        
+        if (predictions.length === 0) {
+            addToast({ title: 'No Predictions', description: 'Model could not predict events for this context.', type: 'info' });
+            updateResearchTask(taskId, { status: 'failed', reasoning: 'No predictions generated.' });
+            return;
+        }
+
+        // Convert Predictions to Patch
+        const newNodes: any[] = [];
+        const newEdges: any[] = [];
+
+        predictions.forEach(p => {
+             // Heuristic: If target doesn't exist in graph, treat as new node candidate
+             const exists = graph.nodes.some(n => n.data.id === p.target || n.data.label === p.target);
+             if (!exists) {
+                 newNodes.push({
+                     id: p.target.toLowerCase().replace(/\s+/g, '_'),
+                     label: p.target,
+                     type: 'event', // Guess type
+                     year: year,
+                     description: 'AI Predicted Event/Entity',
+                     certainty: 'alleged'
+                 });
+             }
+             
+             // Try to map source label to ID
+             const sourceNode = graph.nodes.find(n => n.data.label === p.source || n.data.id === p.source);
+             const sourceId = sourceNode ? sourceNode.data.id : p.source.toLowerCase().replace(/\s+/g, '_');
+
+             newEdges.push({
+                 source: sourceId,
+                 target: p.target.toLowerCase().replace(/\s+/g, '_'),
+                 label: p.relation,
+                 certainty: 'alleged',
+                 dates: String(year)
+             });
+        });
+
+        setPendingPatch({
+            type: 'expansion',
+            reasoning: `Temporal Prediction for ${year}: ${predictions.map(p => p.reasoning).slice(0, 2).join('; ')}...`,
+            nodes: newNodes,
+            edges: newEdges
+        });
+        
+        updateResearchTask(taskId, { status: 'complete', reasoning: 'Generated temporal predictions.' });
+
+    } catch (e) {
+        console.error(e);
+        addToast({ title: 'Prediction Error', description: 'Failed to generate predictions.', type: 'error' });
+        updateResearchTask(taskId, { status: 'failed', reasoning: 'Prediction failed.' });
+    } finally {
+        setThinking(false);
     }
   };
 
@@ -309,12 +400,22 @@ export const SidebarLeft: React.FC = () => {
               <label className="text-[10px] font-bold text-owp-green uppercase tracking-[0.2em] font-spectral opacity-80 pl-1">
                 AI Agents
               </label>
-              <div className="grid grid-cols-1 gap-2">
-                 <button onClick={handleExpand} className="btn-zinc text-emerald-100/80 border-emerald-900/30 hover:border-emerald-500/50">
-                    <BrainCircuit size={16} className="text-emerald-500"/> AI Expand (Context)
+              <div className="grid grid-cols-2 gap-2">
+                 <button onClick={handleExpand} className="btn-zinc text-emerald-100/80 border-emerald-900/30 hover:border-emerald-500/50 flex flex-col items-center justify-center h-16 gap-1 text-center">
+                    <BrainCircuit size={18} className="text-emerald-500"/> 
+                    <span className="text-[10px]">Context Expand</span>
                  </button>
-                 <button onClick={() => handleGroomDupes(true)} className="btn-zinc text-amber-100/80 border-amber-900/30 hover:border-amber-500/50">
-                    <Scissors size={16} className="text-amber-500"/> Semantic Grooming
+                 <button onClick={() => handleGroomDupes(true)} className="btn-zinc text-amber-100/80 border-amber-900/30 hover:border-amber-500/50 flex flex-col items-center justify-center h-16 gap-1 text-center">
+                    <Scissors size={18} className="text-amber-500"/> 
+                    <span className="text-[10px]">Groom Data</span>
+                 </button>
+                 <button onClick={handleGraphRAG} className="btn-zinc text-blue-100/80 border-blue-900/30 hover:border-blue-500/50 flex flex-col items-center justify-center h-16 gap-1 text-center">
+                    <Network size={18} className="text-blue-500"/> 
+                    <span className="text-[10px]">GraphRAG Index</span>
+                 </button>
+                 <button onClick={handleTemporalPrediction} className="btn-zinc text-purple-100/80 border-purple-900/30 hover:border-purple-500/50 flex flex-col items-center justify-center h-16 gap-1 text-center">
+                    <History size={18} className="text-purple-500"/> 
+                    <span className="text-[10px]">Predict {timelineYear || 1926}</span>
                  </button>
               </div>
             </div>
@@ -342,6 +443,20 @@ export const SidebarLeft: React.FC = () => {
                   className={`w-9 h-5 rounded-full relative transition-colors duration-300 ${showCertainty ? 'bg-archival-gold' : 'bg-zinc-800'}`}
                 >
                   <div className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-all duration-300 shadow-md ${showCertainty ? 'left-5' : 'left-1'}`}></div>
+                </button>
+              </div>
+
+              {/* SOTA SECURITY MODE TOGGLE */}
+              <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-950 border border-owp-green/20 rounded-sm hover:border-owp-green/40 transition-colors">
+                <span className="text-sm text-zinc-300 flex items-center gap-2">
+                  <Lock size={14} className={isSecurityMode ? "text-crimson" : "text-zinc-600"}/> 
+                  Clandestine Analysis
+                </span>
+                <button 
+                  onClick={() => setSecurityMode(!isSecurityMode)} 
+                  className={`w-9 h-5 rounded-full relative transition-colors duration-300 ${isSecurityMode ? 'bg-crimson' : 'bg-zinc-800'}`}
+                >
+                  <div className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-all duration-300 shadow-md ${isSecurityMode ? 'left-5' : 'left-1'}`}></div>
                 </button>
               </div>
 
@@ -466,6 +581,21 @@ export const SidebarLeft: React.FC = () => {
                          <div className="col-span-2 text-owp-green flex justify-between font-bold bg-owp-green/10 px-1.5 py-0.5 rounded">
                            <span>Community:</span> <span>#{selectedNode.louvainCommunity}</span>
                          </div>
+                         {/* Security Metrics Display */}
+                         {selectedNode.security && (
+                             <div className="col-span-2 pt-2 mt-2 border-t border-owp-green/10 text-[10px] space-y-1">
+                                <div className="text-crimson font-bold uppercase tracking-wider flex justify-between">
+                                   Infiltration Risk <span>{(selectedNode.security.risk * 100).toFixed(0)}%</span>
+                                </div>
+                                <div className="w-full bg-zinc-800 h-1 rounded-full overflow-hidden">
+                                   <div className={`h-full ${selectedNode.security.risk > 0.5 ? 'bg-crimson' : 'bg-owp-green'}`} style={{ width: `${selectedNode.security.risk * 100}%` }}></div>
+                                </div>
+                                <div className="flex justify-between text-zinc-500">
+                                   <span>Efficiency: {selectedNode.security.efficiency.toFixed(2)}</span>
+                                   <span>Safety: {selectedNode.security.safety.toFixed(2)}</span>
+                                </div>
+                             </div>
+                         )}
                       </div>
                       
                       <div className="grid grid-cols-2 gap-2 pt-2">

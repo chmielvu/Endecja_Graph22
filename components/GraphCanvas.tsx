@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import cytoscape from 'cytoscape';
 import cola from 'cytoscape-cola';
@@ -18,6 +19,7 @@ export const GraphCanvas: React.FC = () => {
     filteredGraph, 
     activeCommunityColoring, 
     showCertainty,
+    isSecurityMode, // Security Mode
     isGroupedByRegion,
     activeLayout,
     layoutParams,
@@ -510,7 +512,7 @@ export const GraphCanvas: React.FC = () => {
     });
   }, [selectedNodeIds]);
 
-  // Update Styling (Colors, Deepening, Certainty)
+  // Update Styling (Colors, Deepening, Certainty, Security)
   useEffect(() => {
     if (!cyRef.current) return;
     const cy = cyRef.current;
@@ -533,7 +535,14 @@ export const GraphCanvas: React.FC = () => {
         
         // 1. Determine Base Color
         let color = '#52525b'; 
-        if (activeCommunityColoring) {
+        
+        // SOTA Security Mode Coloring
+        if (isSecurityMode) {
+             const risk = data.security?.risk || 0;
+             if (risk >= 0.7) color = THEME.colors.crimson;      // High Risk (Red)
+             else if (risk >= 0.4) color = THEME.colors.archivalGold; // Medium Risk (Orange)
+             else color = THEME.colors.owpGreen;                 // Low Risk (Green)
+        } else if (activeCommunityColoring) {
           const commId = data.louvainCommunity !== undefined ? data.louvainCommunity : data.community;
           if (commId !== undefined) {
              color = COMMUNITY_COLORS[commId % COMMUNITY_COLORS.length];
@@ -597,12 +606,21 @@ export const GraphCanvas: React.FC = () => {
                         ele.style('border-style', 'dotted');
                      }
                 }
+
+                // Apply Security Mode Styles (e.g. Risk glowing border)
+                if (isSecurityMode) {
+                    const risk = data.security?.risk || 0;
+                    if (risk > 0.5) {
+                        ele.style('border-width', 2);
+                        ele.style('border-color', '#fff');
+                    }
+                }
             }
         }
       });
     });
 
-  }, [filteredGraph, activeCommunityColoring, deepeningNodeId, showCertainty]);
+  }, [filteredGraph, activeCommunityColoring, deepeningNodeId, showCertainty, isSecurityMode]);
 
   // Animation Pulse Effect
   useEffect(() => {
@@ -649,6 +667,13 @@ export const GraphCanvas: React.FC = () => {
     <div className="w-full h-full relative bg-zinc-950">
       <div ref={containerRef} className="w-full h-full" />
       
+      {/* Year Watermark during Time Travel */}
+      {timelineYear !== null && (
+          <div className="absolute top-6 left-6 pointer-events-none opacity-20 font-spectral text-[8rem] font-bold text-archival-gold leading-none select-none z-0">
+             {timelineYear}
+          </div>
+      )}
+
       {/* Tooltip Overlay */}
       {tooltip && (
         <div 
@@ -669,6 +694,15 @@ export const GraphCanvas: React.FC = () => {
              <span>PR: {(tooltip.data.pagerank || 0).toFixed(2)}</span>
              <span>Region: {tooltip.data.region || 'Unknown'}</span>
           </div>
+          {/* Security Metrics Tooltip */}
+          {tooltip.data.security && isSecurityMode && (
+              <div className="mt-2 pt-2 border-t border-zinc-700 text-[10px] text-crimson font-mono uppercase">
+                  <div>Risk Score: {(tooltip.data.security.risk * 100).toFixed(0)}%</div>
+                  {tooltip.data.security.vulnerabilities.length > 0 && (
+                      <div className="text-zinc-500 normal-case mt-1">{tooltip.data.security.vulnerabilities[0]}</div>
+                  )}
+              </div>
+          )}
         </div>
       )}
 

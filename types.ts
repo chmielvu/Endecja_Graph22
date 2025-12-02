@@ -1,5 +1,4 @@
 
-
 export type NodeType = 'person' | 'organization' | 'event' | 'concept' | 'publication' | 'Person' | 'Organization' | 'Event' | 'Concept' | 'Publication';
 
 export interface NodeData {
@@ -26,11 +25,69 @@ export interface NodeData {
   eigenvector?: number;
   clustering?: number; // Local Clustering Coefficient
 
+  // Clandestine / Security Metrics (SOTA Upgrade)
+  security?: {
+    efficiency: number; // Speed of info spread (Closeness)
+    safety: number; // Isolation from paths (1 - Betweenness)
+    balance: number; // Harmonic mean of Efficiency & Safety
+    risk: number; // Infiltration risk score
+    vulnerabilities: string[];
+  };
+
   // Embedding for semantic search
   embedding?: number[]; 
   sources?: string[];
   certainty?: 'confirmed' | 'disputed' | 'alleged';
 }
+
+// --- TKG ENHANCEMENTS ---
+
+export type TemporalFactType = 
+  | { type: 'instant'; timestamp: string }
+  | { type: 'interval'; start: string; end: string }
+  | { type: 'fuzzy'; approximate: string; uncertainty: number }; // uncertainty 0.0 to 1.0
+
+export interface TemporalFact {
+  id: string;
+  subject: string; // entity ID
+  relation: string;
+  object: string; // entity ID
+  
+  // Temporal Discrimination
+  temporal: TemporalFactType;
+  
+  // Flat Indexing Helpers
+  validFrom?: string; // ISO date or year
+  validTo?: string; // Optional end date
+  
+  certainty: 'confirmed' | 'disputed' | 'alleged';
+  sources: string[];
+}
+
+export interface TemporalNode extends NodeData {
+  // Timeline of existence (e.g. for organizations or movements)
+  existence?: Array<{
+    start: string;
+    end?: string;
+    status: 'active' | 'latent' | 'defunct' | 'reformed';
+  }>;
+  
+  // Role evolution for persons
+  roles?: Array<{
+    role: string;
+    organization: string;
+    start: string;
+    end?: string;
+  }>;
+}
+
+export interface TemporalKnowledgeGraph {
+  nodes: GraphNode[]; // Wrapper around TemporalNode data
+  facts: TemporalFact[]; // Replaces standard edges in TKG mode
+  meta?: KnowledgeGraph['meta'];
+}
+
+// --- STANDARD GRAPH TYPES ---
 
 export interface EdgeData {
   id: string;
@@ -38,15 +95,18 @@ export interface EdgeData {
   target: string;
   label: string; // relationship
   dates?: string;
+  validFrom?: number; // TKG Start
+  validTo?: number; // TKG End
   weight?: number;
   // Triadic Balance
   sign?: 'positive' | 'negative';
   isBalanced?: boolean;
   certainty?: 'confirmed' | 'disputed' | 'alleged';
+  visibility?: 'public' | 'clandestine' | 'private';
 }
 
 export interface GraphNode {
-  data: NodeData;
+  data: NodeData | TemporalNode;
   position?: { x: number; y: number };
   selected?: boolean;
 }
@@ -69,6 +129,7 @@ export interface KnowledgeGraph {
 export interface GraphPatch {
   type: 'expansion' | 'deepening';
   reasoning: string;
+  thoughtSignature?: string; // Gemini 3.0 Continuity Hash
   nodes: Partial<NodeData>[];
   edges: Partial<EdgeData>[];
 }
@@ -116,45 +177,53 @@ export interface LayoutParams {
   gravity: number;
   friction: number;
   spacing: number;
-  nodeRepulsion: number; // For Cose
-  idealEdgeLength: number; // For Cose
+  nodeRepulsion: number;
+  idealEdgeLength: number;
 }
 
 export interface AppState {
-  // Graph State
   graph: KnowledgeGraph;
   filteredGraph: KnowledgeGraph;
-  selectedNodeIds: string[]; // Multi-select
-  editingNodeId: string | null; // For modal
-  
-  // Analysis State
-  metricsCalculated: boolean;
-  activeCommunityColoring: boolean;
-  showCertainty: boolean; // Toggle for Evidence Quality Mode
-  isGroupedByRegion: boolean; // Toggle for Compound Nodes
-  activeLayout: string; // 'cola', 'cose', 'concentric', 'grid', 'circle'
-  layoutParams: LayoutParams;
-  minDegreeFilter: number;
-  regionalAnalysis: RegionalAnalysisResult | null;
-  
-  // UI State
-  isSidebarOpen: boolean;
-  timelineYear: number | null; // Continuous slider value
-  showStatsPanel: boolean;
-  isSemanticSearchOpen: boolean;
-  
-  // AI Patch Review State
+  selectedNodeIds: string[];
+  editingNodeId: string | null;
+  deepeningNodeId: string | null;
   pendingPatch: GraphPatch | null;
   activeResearchTasks: ResearchTask[];
-  
-  // Chat State
+  metricsCalculated: boolean;
+  activeCommunityColoring: boolean;
+  showCertainty: boolean;
+  isSecurityMode: boolean;
+  isGroupedByRegion: boolean;
+  activeLayout: string;
+  layoutParams: LayoutParams;
+  minDegreeFilter: number;
+  isSidebarOpen: boolean;
+  isRightSidebarOpen: boolean;
+  timelineYear: number | null;
+  isPlaying: boolean;
+  regionalAnalysis: RegionalAnalysisResult | null;
+  showStatsPanel: boolean;
+  isSemanticSearchOpen: boolean;
   messages: ChatMessage[];
   isThinking: boolean;
-
-  // Notifications
   toasts: Toast[];
+  _history: {
+    past: KnowledgeGraph[];
+    future: KnowledgeGraph[];
+  };
+}
 
-  // History
-  canUndo: () => boolean;
-  canRedo: () => boolean;
+export interface CommunitySummary {
+  id: string;
+  level: number;
+  communityId: number;
+  summary: string;
+  entities: string[];
+  timespan: string;
+  region: string;
+}
+
+export interface GraphRAGIndex {
+  hierarchies: Record<number, Record<string, number>>;
+  summaries: CommunitySummary[];
 }
